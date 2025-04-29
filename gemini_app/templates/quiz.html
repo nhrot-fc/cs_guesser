@@ -1,0 +1,247 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POSCOMP Quiz</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center p-4">
+    <div class="card w-full max-w-3xl bg-gray-900 border-gray-800">
+        <div class="card-header space-y-2 pb-2">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-purple-400" id="general-topic">{{ question.general_topic }}</h1>
+                <div class="text-sm text-gray-400">
+                    Puntaje: <span id="score">0</span>/<span id="total-answered">0</span> | 
+                    Accuracy: <span id="accuracy">0</span>%
+                </div>
+            </div>
+            <h2 class="text-lg font-medium text-gray-300" id="specific-topic">{{ question.specific_topic }}</h2>
+            <span class="badge {% if question.difficulty == 'Fácil' %}border-green-600 text-green-400
+                      {% elif question.difficulty == 'Medio' %}border-yellow-600 text-yellow-400
+                      {% elif question.difficulty == 'Difícil' %}border-red-600 text-red-400{% endif %}" 
+                  id="difficulty">
+                {{ question.difficulty }}
+            </span>
+        </div>
+
+        <div class="card-content space-y-6">
+            <div class="text-xl font-medium py-2" id="question-text">{{ question.question_text }}</div>
+
+            <div class="space-y-3" id="options-container">
+                {% for option in question.options %}
+                <button class="option-btn w-full justify-start text-left h-auto py-3 px-4 transition-all border-gray-700 hover:border-gray-500"
+                        data-index="{{ forloop.counter0 }}">
+                    <span class="mr-2">{{ forloop.counter|add:"64"|stringformat:"c" }}.</span> {{ option }}
+                </button>
+                {% endfor %}
+            </div>
+
+            <div id="action-container">
+                <button id="confirm-btn" class="w-full bg-purple-700 hover:bg-purple-600 text-white py-2 px-4 rounded" disabled>
+                    Confirmar respuesta
+                </button>
+            </div>
+
+            <div id="result-container" class="space-y-4 animate-fadeIn hidden">
+                <div id="result-message" class="flex items-center p-4 rounded-md">
+                    <span id="result-icon" class="mr-2"></span>
+                    <span id="result-text" class="font-medium"></span>
+                </div>
+
+                <div class="bg-gray-800/50 p-4 rounded-md">
+                    <div class="flex items-center mb-2 text-purple-400">
+                        <span id="book-icon" class="mr-2"></span>
+                        <h3 class="font-medium">Explicación</h3>
+                    </div>
+                    <p class="text-gray-300" id="explanation">{{ question.explanation }}</p>
+                </div>
+
+                <button id="next-btn" class="w-full bg-purple-700 hover:bg-purple-600 text-white py-2 px-4 rounded">
+                    <span>Siguiente pregunta</span>
+                    <span id="next-icon" class="ml-2"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="card-footer text-xs text-gray-500 pt-2">
+            POSCOMP Quiz - Pregunta #<span id="question-id">{{ question.id }}</span>
+        </div>
+    </div>
+
+    <script>
+        let currentQuestion = {{ question|safe }};
+        let selectedOption = null;
+        let score = 0;
+        let totalAnswered = 0;
+        let accuracy = 0;
+        let correctIndex = {{ question.correct_index }};
+
+        lucide.createIcons();
+        
+        const optionButtons = document.querySelectorAll('.option-btn');
+        const confirmBtn = document.getElementById('confirm-btn');
+        const resultContainer = document.getElementById('result-container');
+        const resultMessage = document.getElementById('result-message');
+        const resultIcon = document.getElementById('result-icon');
+        const resultText = document.getElementById('result-text');
+        const nextBtn = document.getElementById('next-btn');
+        const scoreElement = document.getElementById('score');
+        const totalAnsweredElement = document.getElementById('total-answered');
+        const accuracyElement = document.getElementById('accuracy');
+        
+    
+        document.getElementById('result-icon').innerHTML = `
+            <i data-lucide="check-circle" class="h-5 w-5"></i>
+        `;
+        document.getElementById('book-icon').innerHTML = `
+            <i data-lucide="book-open" class="h-5 w-5"></i>
+        `;
+        document.getElementById('next-icon').innerHTML = `
+            <i data-lucide="chevron-right" class="h-4 w-4"></i>
+        `;
+        lucide.createIcons();
+
+        optionButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                optionButtons.forEach(btn => {
+                    btn.classList.remove('border-purple-500', 'bg-purple-950/30');
+                    btn.classList.add('border-gray-700');
+                });
+                
+                this.classList.remove('border-gray-700');
+                this.classList.add('border-purple-500', 'bg-purple-950/30');
+                
+                selectedOption = parseInt(this.getAttribute('data-index'));
+                
+                confirmBtn.disabled = false;
+            });
+        });
+
+        confirmBtn.addEventListener('click', function() {
+            if (selectedOption === null) return;
+            
+            showResult();
+            
+            totalAnswered++;
+            if (selectedOption === correctIndex) {
+                score++;
+            }
+            updateStats();
+        });
+
+        nextBtn.addEventListener('click', function() {
+            fetch('{% url "poscomp_quiz:next_question" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    selected_option: selectedOption,
+                    correct_index: correctIndex
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadNextQuestion(data);
+            })
+            .catch(error => console.error('Error:', error));
+        });
+
+        function showResult() {
+            confirmBtn.style.display = 'none';
+            
+            resultContainer.classList.remove('hidden');
+            
+            const isCorrect = selectedOption === correctIndex;
+            
+            if (isCorrect) {
+                resultMessage.classList.add('bg-green-950/30', 'text-green-400');
+                resultText.textContent = '¡Correcto!';
+                resultIcon.innerHTML = '<i data-lucide="check-circle" class="h-5 w-5"></i>';
+            } else {
+                resultMessage.classList.add('bg-red-950/30', 'text-red-400');
+                resultText.textContent = 'Incorrecto';
+                resultIcon.innerHTML = '<i data-lucide="x-circle" class="h-5 w-5"></i>';
+                
+                optionButtons[correctIndex].classList.add('border-green-500', 'bg-green-950/30');
+                
+                if (selectedOption !== null) {
+                    optionButtons[selectedOption].classList.add('border-red-500', 'bg-red-950/30');
+                }
+            }
+            
+            optionButtons.forEach(btn => {
+                btn.disabled = true;
+            });
+            
+            lucide.createIcons();
+        }
+
+        function updateStats() {
+            scoreElement.textContent = score;
+            totalAnsweredElement.textContent = totalAnswered;
+            if (totalAnswered > 0) {
+                accuracy = Math.round((score / totalAnswered) * 100);
+            }
+            accuracyElement.textContent = accuracy;
+        }
+
+        function loadNextQuestion(question) {
+            currentQuestion = question;
+            correctIndex = question.correct_index;
+            
+            document.getElementById('general-topic').textContent = question.general_topic;
+            document.getElementById('specific-topic').textContent = question.specific_topic;
+            document.getElementById('question-text').textContent = question.question_text;
+            document.getElementById('difficulty').textContent = question.difficulty;
+            document.getElementById('explanation').textContent = question.explanation;
+            document.getElementById('question-id').textContent = question.id;
+            
+            const difficultyBadge = document.getElementById('difficulty');
+            difficultyBadge.className = 'badge'; 
+            if (question.difficulty === 'Fácil') {
+                difficultyBadge.classList.add('border-green-600', 'text-green-400');
+            } else if (question.difficulty === 'Medio') {
+                difficultyBadge.classList.add('border-yellow-600', 'text-yellow-400');
+            } else if (question.difficulty === 'Difícil') {
+                difficultyBadge.classList.add('border-red-600', 'text-red-400');
+            }
+            
+            optionButtons.forEach((btn, index) => {
+                if (index < question.options.length) {
+                    btn.innerHTML = `<span class="mr-2">${String.fromCharCode(65 + index)}.</span> ${question.options[index]}`;
+                    btn.setAttribute('data-index', index);
+                    btn.disabled = false;
+                    btn.classList.remove('border-purple-500', 'bg-purple-950/30', 'border-green-500', 'bg-green-950/30', 'border-red-500', 'bg-red-950/30');
+                    btn.classList.add('border-gray-700');
+                }
+            });
+            
+            selectedOption = null;
+            
+            resultContainer.classList.add('hidden');
+            confirmBtn.style.display = 'block';
+            confirmBtn.disabled = true;
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+</body>
+</html>
