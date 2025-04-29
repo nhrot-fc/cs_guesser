@@ -1,342 +1,358 @@
+{% extends 'base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>POSCOMP Quiz</title>
-    <link rel="stylesheet" href="{% static 'css/output.css' %}">
-    <script src="https://unpkg.com/lucide@latest"></script>
-</head>
-<body class="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center p-4">
-    <div class="card w-full max-w-3xl bg-gray-900 border-gray-800">
-        <div class="card-header space-y-2 pb-2">
-            <div class="flex justify-between items-center">
-                <h1 class="text-2xl font-bold text-purple-400" id="general-topic">{{ question.general_topic }}</h1>
-                <div class="text-sm text-gray-400">
-                    Puntaje: <span id="score">0</span>/<span id="total-answered">0</span> | 
-                    Accuracy: <span id="accuracy">0</span>%
+
+{% block extra_css %}
+<style>
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    @keyframes fadeIn {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+    }
+    @keyframes slideIn {
+        0% { transform: translateY(20px); opacity: 0; }
+        100% { transform: translateY(0); opacity: 1; }
+    }
+    .animate-pulse { animation: pulse 2s infinite; }
+    .animate-fadeIn { animation: fadeIn 0.5s ease-out; }
+    .animate-slideIn { animation: slideIn 0.5s ease-out; }
+    .streak-indicator { 
+        transition: all 0.3s ease;
+    }
+    .confetti {
+        position: fixed;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        animation: fall 3s ease-in forwards;
+        z-index: 1000;
+        pointer-events: none;
+    }
+    @keyframes fall {
+        to { transform: translateY(100vh) rotate(720deg); }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="flex items-center justify-center p-4">
+    <!-- Card container with position relative for absolute positioning inside -->
+    <div class="w-full max-w-3xl relative">
+        <!-- Stats bar - top area -->
+        <div class="flex justify-between items-center w-full mb-4">
+            <!-- Timer on left -->
+            <div class="bg-dark-matter border border-void-purple/30 py-2 px-4 rounded-full shadow-lg flex items-center space-x-2">
+                <span id="timer-icon"></span>
+                <span id="timer" class="font-mono font-medium">00:00</span>
+            </div>
+            
+            <!-- Score in center -->
+            <div class="bg-dark-matter border border-void-purple/30 py-2 px-4 rounded-lg shadow-lg flex items-center space-x-2">
+                <span id="score-icon"></span>
+                <div>
+                    Puntaje: <span id="score" class="font-bold text-void-purple">0</span>/<span id="total-answered" class="font-bold">0</span> | 
+                    Accuracy: <span id="accuracy" class="font-bold text-void-purple">0</span>%
                 </div>
             </div>
-            <h2 class="text-lg font-medium text-gray-300" id="specific-topic">{{ question.specific_topic }}</h2>
-            <span class="badge {% if question.difficulty == 'Fácil' %}border-green-600 text-green-400
-                      {% elif question.difficulty == 'Medio' %}border-yellow-600 text-yellow-400
-                      {% elif question.difficulty == 'Difícil' %}border-red-600 text-red-400{% endif %}" 
-                  id="difficulty">
-                {{ question.difficulty }}
-            </span>
+            
+            <!-- Streak on right -->
+            <div id="streak-indicator" class="bg-gradient-to-r from-void-purple to-deep-void py-2 px-4 rounded-full shadow-lg hidden animate-fadeIn flex items-center space-x-2">
+                <span id="streak-icon"></span>
+                <span class="font-bold"><span id="streak-count">0</span> en racha!</span>
+            </div>
         </div>
-
-        <div class="card-content space-y-6">
-            <div class="text-xl font-medium py-2" id="question-text">{{ question.question_text }}</div>
-
-            <!-- Panel de Pistas (nuevo) -->
-            <div id="clues-container" class="bg-gray-800/30 p-4 rounded-md">
-                <div class="flex justify-between items-center mb-2">
-                    <div class="flex items-center text-purple-400">
-                        <span class="mr-2"><i data-lucide="lightbulb" class="h-5 w-5"></i></span>
-                        <h3 class="font-medium">Pistas</h3>
+    
+        <!-- Main card -->
+        <div class="card w-full bg-dark-matter border border-void-purple/30 p-6 rounded-lg shadow-xl animate-fadeIn">
+            <div class="card-header space-y-2 pb-4 border-b border-dark-matter/80">
+                <div class="flex justify-between items-center">
+                    <h1 class="text-2xl font-bold text-void-purple" id="general-topic">{{ question.metadata.topic }}</h1>
+                    
+                    <!-- Question number -->
+                    <div class="flex items-center space-x-1 bg-deep-space/50 px-3 py-1 rounded-lg">
+                        <span id="question-num-icon"></span>
+                        <span class="text-ghost-gray">Pregunta #<span id="question-id">{{ question.metadata.tags.0 }}</span></span>
                     </div>
-                    <button id="show-clue-btn" class="text-sm text-purple-400 hover:text-purple-300">
-                        Mostrar pista
+                </div>
+                <h2 class="text-lg font-medium text-code-white" id="specific-topic">{{ question.metadata.subtopic }}</h2>
+                <div class="flex flex-wrap items-center gap-2 mt-2">
+                    <span class="badge px-3 py-1 bg-dark-matter/80 border border-void-purple/50 text-void-purple rounded-full flex items-center space-x-1" id="question-type">
+                        <span id="question-type-icon"></span>
+                        <span>{{ question.questionType }}</span>
+                    </span>
+                    <span class="badge px-3 py-1 bg-dark-matter/80 border border-void-purple/50 text-void-purple rounded-full flex items-center space-x-1" id="answer-type">
+                        <span id="answer-type-icon"></span>
+                        <span>{{ question.answerType }}</span>
+                    </span>
+                    <span class="badge px-3 py-1 rounded-full flex items-center space-x-1 bg-dark-matter/80 border-void-purple/50 text-void-purple" id="difficulty">
+                        <span id="difficulty-icon"></span>
+                        <span>{{ question.metadata.difficulty }}</span>
+                    </span>
+                    {% if question.metadata.tags %}
+                    <span class="badge px-3 py-1 bg-deep-space/50 border border-dark-matter text-ghost-gray rounded-full flex items-center space-x-1">
+                        <span id="tag-icon"></span>
+                        <span>{{ question.metadata.tags.0 }}</span>
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card-content space-y-6 my-6">
+                <div class="text-xl font-medium p-4 bg-deep-space/70 rounded-lg border border-dark-matter shadow-inner" id="question-text">{{ question.question }}</div>
+
+                <!-- Progress -->
+                <div class="w-full bg-deep-space rounded-full h-2.5 overflow-hidden">
+                    <div id="progress-bar" class="bg-gradient-to-r from-void-purple to-cyber-blue h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+
+                <!-- Panel de Pistas -->
+                <div id="clues-container" class="bg-deep-space/70 border border-dark-matter p-4 rounded-lg shadow-md transition-all">
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="flex items-center text-void-purple">
+                            <span class="mr-2" id="clue-icon"></span>
+                            <h3 class="font-medium">Pistas</h3>
+                        </div>
+                        <button id="show-clue-btn" class="text-sm text-void-purple hover:text-deep-void bg-dark-matter px-3 py-1 rounded-full transition-colors flex items-center">
+                            <span id="show-clue-icon" class="mr-1"></span>
+                            Mostrar pista
+                        </button>
+                    </div>
+                    <div id="clues-list" class="space-y-2">
+                        {% for clue in question.clues %}
+                        <p id="clue-{{ forloop.counter0 }}" class="text-ghost-gray hidden p-2 border-l-2 border-void-purple pl-3 animate-slideIn">{{ clue }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="space-y-3" id="options-container">
+                    {% for option in question.options %}
+                    <button id="option-{{ forloop.counter0 }}" class="option-btn w-full justify-start text-left h-auto py-3 px-4 transition-all border border-dark-matter hover:border-void-purple bg-deep-space/70 rounded-md flex items-center group hover:bg-dark-matter/80"
+                            data-index="{{ forloop.counter0 }}" data-answer="{{ option.answer }}">
+                        <span class="inline-flex justify-center items-center w-8 h-8 mr-3 rounded-full bg-dark-matter text-void-purple group-hover:bg-void-purple group-hover:text-code-white">{{ forloop.counter|add:"64"|stringformat:"c" }}</span> 
+                        <span class="option-text">{{ option.label }}</span>
+                    </button>
+                    {% endfor %}
+                </div>
+
+                <div id="action-container" class="mt-6">
+                    <button id="confirm-btn" class="w-full bg-gradient-to-r from-void-purple to-deep-void hover:from-deep-void hover:to-deep-void/90 text-code-white py-3 px-4 rounded-md shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100 flex justify-center items-center space-x-2" disabled>
+                        <span id="confirm-icon"></span>
+                        <span>Confirmar respuesta</span>
                     </button>
                 </div>
-                <div id="clues-list" class="space-y-2">
-                    <!-- Las pistas se mostrarán aquí -->
-                </div>
-            </div>
 
-            <div class="space-y-3" id="options-container">
-                {% for option in question.options %}
-                <button class="option-btn w-full justify-start text-left h-auto py-3 px-4 transition-all border-gray-700 hover:border-gray-500"
-                        data-index="{{ forloop.counter0 }}">
-                    <span class="mr-2">{{ forloop.counter|add:"64"|stringformat:"c" }}.</span> {{ option }}
-                </button>
-                {% endfor %}
-            </div>
-
-            <div id="action-container">
-                <button id="confirm-btn" class="w-full bg-purple-700 hover:bg-purple-600 text-white py-2 px-4 rounded" disabled>
-                    Confirmar respuesta
-                </button>
-            </div>
-
-            <div id="result-container" class="space-y-4 animate-fadeIn hidden">
-                <div id="result-message" class="flex items-center p-4 rounded-md">
-                    <span id="result-icon" class="mr-2"></span>
-                    <span id="result-text" class="font-medium"></span>
-                </div>
-
-                <div class="bg-gray-800/50 p-4 rounded-md">
-                    <div class="flex items-center mb-2 text-purple-400">
-                        <span id="book-icon" class="mr-2"></span>
-                        <h3 class="font-medium">Explicación</h3>
+                <div id="result-container" class="space-y-4 animate-fadeIn hidden">
+                    <div id="result-message" class="flex items-center p-4 rounded-md shadow-md">
+                        <span id="result-icon" class="mr-2"></span>
+                        <span id="result-text" class="font-medium"></span>
                     </div>
-                    <p class="text-gray-300" id="explanation">{{ question.explanation }}</p>
+
+                    <div class="bg-deep-space/70 border border-dark-matter p-4 rounded-lg shadow-md">
+                        <div class="flex items-center mb-2 text-void-purple">
+                            <span id="book-icon" class="mr-2"></span>
+                            <h3 class="font-medium">Explicación</h3>
+                        </div>
+                        <p class="text-ghost-gray" id="explanation">{{ question.summary }}</p>
+                    </div>
+
+                    <button id="next-btn" class="w-full bg-gradient-to-r from-void-purple to-deep-void hover:from-deep-void hover:to-deep-void/90 text-code-white py-3 px-4 rounded-md shadow-lg transition-all transform hover:scale-[1.02] flex justify-center items-center">
+                        <span>Siguiente pregunta</span>
+                        <span id="next-icon" class="ml-2"></span>
+                    </button>
                 </div>
-
-                <button id="next-btn" class="w-full bg-purple-700 hover:bg-purple-600 text-white py-2 px-4 rounded">
-                    <span>Siguiente pregunta</span>
-                    <span id="next-icon" class="ml-2"></span>
-                </button>
             </div>
-        </div>
 
-        <div class="card-footer text-xs text-gray-500 pt-2">
-            POSCOMP Quiz - Pregunta #<span id="question-id">{{ question.id }}</span>
+            <div class="card-footer text-xs text-ghost-gray pt-4 border-t border-dark-matter/80 flex justify-between items-center">
+                <div class="flex items-center space-x-1">
+                    <span id="poscomp-icon"></span>
+                    <span>POSCOMP Quiz</span>
+                </div>
+            </div>
         </div>
     </div>
+</div>
+{% endblock %}
 
-    <script>
-        let currentQuestion = {{ question|safe }};
-        let selectedOption = null;
-        let score = 0;
-        let totalAnswered = 0;
-        let accuracy = 0;
-        let correctIndex = {{ question.correct_index }};
-        let currentClueIndex = -1; // Ninguna pista mostrada inicialmente
-
-        // Asegurar que los iconos estén disponibles
-        function initializeIcons() {
-            document.getElementById('result-icon').innerHTML = `
-                <i data-lucide="check-circle" class="h-5 w-5"></i>
-            `;
-            document.getElementById('book-icon').innerHTML = `
-                <i data-lucide="book-open" class="h-5 w-5"></i>
-            `;
-            document.getElementById('next-icon').innerHTML = `
-                <i data-lucide="chevron-right" class="h-4 w-4"></i>
-            `;
-            lucide.createIcons();
-        }
-
-        // Inicializar la aplicación
-        function initialize() {
-            console.log('Inicializando aplicación quiz...');
-            console.log('Pregunta cargada:', currentQuestion);
-            initializeIcons();
-            setupEventListeners();
-        }
-
-        // Configurar todos los event listeners
-        function setupEventListeners() {
-            // Botones de opciones
-            document.querySelectorAll('.option-btn').forEach(button => {
-                button.addEventListener('click', handleOptionClick);
+{% block extra_js %}
+<script>
+    // Icons setup
+    document.getElementById('score-icon').innerHTML = '<i data-lucide="trophy" class="h-4 w-4 text-void-purple"></i>';
+    document.getElementById('clue-icon').innerHTML = '<i data-lucide="lightbulb" class="h-5 w-5"></i>';
+    document.getElementById('show-clue-icon').innerHTML = '<i data-lucide="eye" class="h-4 w-4"></i>';
+    document.getElementById('confirm-icon').innerHTML = '<i data-lucide="check-circle" class="h-5 w-5"></i>';
+    document.getElementById('book-icon').innerHTML = '<i data-lucide="book-open" class="h-5 w-5"></i>';
+    document.getElementById('next-icon').innerHTML = '<i data-lucide="arrow-right" class="h-5 w-5"></i>';
+    document.getElementById('poscomp-icon').innerHTML = '<i data-lucide="code" class="h-4 w-4 text-ghost-gray"></i>';
+    document.getElementById('question-num-icon').innerHTML = '<i data-lucide="hash" class="h-4 w-4 text-ghost-gray"></i>';
+    document.getElementById('timer-icon').innerHTML = '<i data-lucide="timer" class="h-4 w-4 text-void-purple"></i>';
+    document.getElementById('streak-icon').innerHTML = '<i data-lucide="flame" class="h-5 w-5 text-code-white"></i>';
+    document.getElementById('question-type-icon').innerHTML = '<i data-lucide="brain" class="h-4 w-4"></i>';
+    document.getElementById('answer-type-icon').innerHTML = '<i data-lucide="check-square" class="h-4 w-4"></i>';
+    document.getElementById('difficulty-icon').innerHTML = '<i data-lucide="bar-chart-2" class="h-4 w-4"></i>';
+    document.getElementById('tag-icon').innerHTML = '<i data-lucide="tag" class="h-4 w-4"></i>';
+    
+    // Variables for quiz functionality
+    let selectedOptionIndex = null;
+    let score = 0;
+    let totalAnswered = 0;
+    let currentStreak = 0;
+    let maxStreak = 0;
+    let cluesShown = 0;
+    let startTime = new Date();
+    let timerInterval;
+    
+    // Setup timer
+    function startTimer() {
+        startTime = new Date();
+        timerInterval = setInterval(updateTimer, 1000);
+    }
+    
+    function updateTimer() {
+        const now = new Date();
+        const diff = Math.floor((now - startTime) / 1000);
+        const minutes = Math.floor(diff / 60).toString().padStart(2, '0');
+        const seconds = (diff % 60).toString().padStart(2, '0');
+        document.getElementById('timer').textContent = `${minutes}:${seconds}`;
+    }
+    
+    // Option selection
+    const optionBtns = document.querySelectorAll('.option-btn');
+    const confirmBtn = document.getElementById('confirm-btn');
+    
+    optionBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Reset previously selected option
+            optionBtns.forEach(b => {
+                b.classList.remove('border-void-purple', 'bg-dark-matter/40');
             });
             
-            // Botón confirmar respuesta
-            document.getElementById('confirm-btn').addEventListener('click', handleConfirmClick);
+            // Set new selected option
+            btn.classList.add('border-void-purple', 'bg-dark-matter/40');
+            selectedOptionIndex = parseInt(btn.dataset.index);
+            confirmBtn.removeAttribute('disabled');
+            confirmBtn.classList.add('animate-pulse');
+        });
+    });
+    
+    // Clue reveal functionality
+    const showClueBtn = document.getElementById('show-clue-btn');
+    const cluesList = document.querySelectorAll('[id^="clue-"]');
+    
+    showClueBtn.addEventListener('click', function() {
+        if (cluesShown < cluesList.length) {
+            document.getElementById(`clue-${cluesShown}`).classList.remove('hidden');
+            cluesShown++;
             
-            // Botón siguiente pregunta
-            document.getElementById('next-btn').addEventListener('click', handleNextClick);
-            
-            // Botón de pistas
-            document.getElementById('show-clue-btn').addEventListener('click', showNextClue);
-        }
-
-        function handleOptionClick() {
-            document.querySelectorAll('.option-btn').forEach(btn => {
-                btn.classList.remove('border-purple-500', 'bg-purple-950/30');
-                btn.classList.add('border-gray-700');
-            });
-            
-            this.classList.remove('border-gray-700');
-            this.classList.add('border-purple-500', 'bg-purple-950/30');
-            
-            selectedOption = parseInt(this.getAttribute('data-index'));
-            
-            document.getElementById('confirm-btn').disabled = false;
-        }
-
-        function handleConfirmClick() {
-            if (selectedOption === null) return;
-            
-            showResult();
-            
-            totalAnswered++;
-            if (selectedOption === correctIndex) {
-                score++;
+            if (cluesShown === cluesList.length) {
+                showClueBtn.disabled = true;
+                showClueBtn.classList.add('opacity-50');
             }
-            updateStats();
         }
-
-        function handleNextClick() {
-            fetch('{% url "cs_quiz:next_question" %}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({
-                    selected_option: selectedOption,
-                    correct_index: correctIndex
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                loadNextQuestion(data);
-            })
-            .catch(error => console.error('Error:', error));
-        }
-
-        function showResult() {
-            document.getElementById('confirm-btn').style.display = 'none';
+    });
+    
+    // Answer confirmation
+    confirmBtn.addEventListener('click', function() {
+        if (selectedOptionIndex === null) return;
+        
+        confirmBtn.classList.remove('animate-pulse');
+        confirmBtn.disabled = true;
+        
+        const selectedOption = document.getElementById(`option-${selectedOptionIndex}`);
+        const isCorrect = selectedOption.dataset.answer === 'True';
+        
+        totalAnswered++;
+        document.getElementById('total-answered').textContent = totalAnswered;
+        
+        if (isCorrect) {
+            score++;
+            currentStreak++;
+            if (currentStreak > maxStreak) maxStreak = currentStreak;
             
-            const resultContainer = document.getElementById('result-container');
-            resultContainer.classList.remove('hidden');
+            // Show streak indicator
+            if (currentStreak > 1) {
+                document.getElementById('streak-count').textContent = currentStreak;
+                document.getElementById('streak-indicator').classList.remove('hidden');
+                
+                // Add fire effect based on streak
+                if (currentStreak >= 3) {
+                    createConfetti(20);
+                }
+            }
+            
+            selectedOption.classList.add('border-neon-mint', 'bg-neon-mint/10');
+            const resultMessage = document.getElementById('result-message');
+            resultMessage.classList.add('bg-neon-mint/10', 'border', 'border-neon-mint', 'text-neon-mint');
+            document.getElementById('result-icon').innerHTML = '<i data-lucide="check-circle" class="h-5 w-5 text-neon-mint"></i>';
+            document.getElementById('result-text').textContent = '¡Respuesta correcta!';
+        } else {
+            currentStreak = 0;
+            document.getElementById('streak-indicator').classList.add('hidden');
+            
+            selectedOption.classList.add('border-hot-pink', 'bg-hot-pink/10');
+            
+            // Find and highlight correct answer
+            optionBtns.forEach(btn => {
+                if (btn.dataset.answer === 'True') {
+                    btn.classList.add('border-neon-mint');
+                }
+            });
             
             const resultMessage = document.getElementById('result-message');
-            const resultText = document.getElementById('result-text');
-            const resultIcon = document.getElementById('result-icon');
-            
-            const isCorrect = selectedOption === correctIndex;
-            resultMessage.className = 'flex items-center p-4 rounded-md'; // Resetear clases
-            
-            if (isCorrect) {
-                resultMessage.classList.add('bg-green-950/30', 'text-green-400');
-                resultText.textContent = '¡Correcto!';
-                resultIcon.innerHTML = '<i data-lucide="check-circle" class="h-5 w-5"></i>';
-            } else {
-                resultMessage.classList.add('bg-red-950/30', 'text-red-400');
-                resultText.textContent = 'Incorrecto';
-                resultIcon.innerHTML = '<i data-lucide="x-circle" class="h-5 w-5"></i>';
-                
-                const optionButtons = document.querySelectorAll('.option-btn');
-                // Destacar la respuesta correcta
-                if (correctIndex >= 0 && correctIndex < optionButtons.length) {
-                    optionButtons[correctIndex].classList.add('border-green-500', 'bg-green-950/30');
-                }
-                
-                // Destacar la respuesta incorrecta seleccionada
-                if (selectedOption !== null && selectedOption >= 0 && selectedOption < optionButtons.length) {
-                    optionButtons[selectedOption].classList.add('border-red-500', 'bg-red-950/30');
-                }
-            }
-            
-            document.querySelectorAll('.option-btn').forEach(btn => {
-                btn.disabled = true;
-            });
-            
-            // Mostrar todas las pistas al revelar la respuesta
-            showAllClues();
-            
-            lucide.createIcons();
-        }
-
-        function updateStats() {
-            document.getElementById('score').textContent = score;
-            document.getElementById('total-answered').textContent = totalAnswered;
-            if (totalAnswered > 0) {
-                accuracy = Math.round((score / totalAnswered) * 100);
-            }
-            document.getElementById('accuracy').textContent = accuracy;
-        }
-
-        function loadNextQuestion(question) {
-            console.log('Cargando nueva pregunta:', question);
-            currentQuestion = question;
-            correctIndex = question.correct_index;
-            
-            // Resetear el índice de pistas
-            currentClueIndex = -1;
-            document.getElementById('clues-list').innerHTML = '';
-            
-            document.getElementById('general-topic').textContent = question.general_topic;
-            document.getElementById('specific-topic').textContent = question.specific_topic;
-            document.getElementById('question-text').textContent = question.question_text;
-            document.getElementById('difficulty').textContent = question.difficulty;
-            document.getElementById('explanation').textContent = question.explanation;
-            document.getElementById('question-id').textContent = question.id;
-            
-            // Actualizar la clase del badge según dificultad
-            const difficultyBadge = document.getElementById('difficulty');
-            difficultyBadge.className = 'badge'; 
-            if (question.difficulty === 'Fácil') {
-                difficultyBadge.classList.add('border-green-600', 'text-green-400');
-            } else if (question.difficulty === 'Medio') {
-                difficultyBadge.classList.add('border-yellow-600', 'text-yellow-400');
-            } else if (question.difficulty === 'Difícil') {
-                difficultyBadge.classList.add('border-red-600', 'text-red-400');
-            }
-            
-            // Actualizar opciones
-            const optionButtons = document.querySelectorAll('.option-btn');
-            optionButtons.forEach((btn, index) => {
-                if (index < question.options.length) {
-                    btn.innerHTML = `<span class="mr-2">${String.fromCharCode(65 + index)}.</span> ${question.options[index]}`;
-                    btn.setAttribute('data-index', index);
-                    btn.disabled = false;
-                    btn.classList.remove('border-purple-500', 'bg-purple-950/30', 'border-green-500', 'bg-green-950/30', 'border-red-500', 'bg-red-950/30');
-                    btn.classList.add('border-gray-700');
-                }
-            });
-            
-            selectedOption = null;
-            
-            document.getElementById('result-container').classList.add('hidden');
-            document.getElementById('confirm-btn').style.display = 'block';
-            document.getElementById('confirm-btn').disabled = true;
-        }
-
-        function showNextClue() {
-            if (!currentQuestion || !currentQuestion.clues || currentQuestion.clues.length === 0) {
-                return;
-            }
-            
-            if (currentClueIndex < currentQuestion.clues.length - 1) {
-                currentClueIndex++;
-                const clue = currentQuestion.clues[currentClueIndex];
-                const clueElement = document.createElement('div');
-                clueElement.className = 'p-2 border-l-2 border-purple-500 pl-3 text-gray-300 animate-fadeIn';
-                clueElement.textContent = clue;
-                document.getElementById('clues-list').appendChild(clueElement);
-                
-                // Deshabilitar el botón si ya se mostraron todas las pistas
-                if (currentClueIndex === currentQuestion.clues.length - 1) {
-                    document.getElementById('show-clue-btn').textContent = 'Todas las pistas mostradas';
-                    document.getElementById('show-clue-btn').disabled = true;
-                    document.getElementById('show-clue-btn').classList.add('opacity-50');
-                }
-            }
+            resultMessage.classList.add('bg-hot-pink/10', 'border', 'border-hot-pink', 'text-hot-pink');
+            document.getElementById('result-icon').innerHTML = '<i data-lucide="x-circle" class="h-5 w-5 text-hot-pink"></i>';
+            document.getElementById('result-text').textContent = 'Respuesta incorrecta';
         }
         
-        function showAllClues() {
-            if (!currentQuestion || !currentQuestion.clues) return;
-            
-            const cluesList = document.getElementById('clues-list');
-            cluesList.innerHTML = '';
-            
-            currentQuestion.clues.forEach(clue => {
-                const clueElement = document.createElement('div');
-                clueElement.className = 'p-2 border-l-2 border-purple-500 pl-3 text-gray-300';
-                clueElement.textContent = clue;
-                cluesList.appendChild(clueElement);
-            });
-            
-            currentClueIndex = currentQuestion.clues.length - 1;
-            document.getElementById('show-clue-btn').textContent = 'Todas las pistas mostradas';
-            document.getElementById('show-clue-btn').disabled = true;
-            document.getElementById('show-clue-btn').classList.add('opacity-50');
-        }
-
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        }
+        // Update score and accuracy
+        document.getElementById('score').textContent = score;
+        const accuracy = Math.round((score / totalAnswered) * 100);
+        document.getElementById('accuracy').textContent = accuracy;
         
-        // Inicializar al cargar la página
-        document.addEventListener('DOMContentLoaded', initialize);
-    </script>
-</body>
-</html>
+        // Update progress bar
+        document.getElementById('progress-bar').style.width = `${accuracy}%`;
+        
+        // Show result container
+        document.getElementById('result-container').classList.remove('hidden');
+        
+        // Disable all option buttons
+        optionBtns.forEach(btn => {
+            btn.disabled = true;
+            btn.classList.add('opacity-75');
+        });
+        
+        // Initialize icons in the result section
+        lucide.createIcons();
+    });
+    
+    // Next question button
+    document.getElementById('next-btn').addEventListener('click', function() {
+        location.reload(); // For demo purposes - would be replaced with AJAX call
+    });
+    
+    // Confetti effect
+    function createConfetti(numParticles) {
+        const colors = ['#7F5AF0', '#6844E1', '#2CB6F6', '#05F2AF', '#EAEAF2'];
+        
+        for (let i = 0; i < numParticles; i++) {
+            const confetti = document.createElement('div');
+            confetti.classList.add('confetti');
+            confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            confetti.style.left = `${Math.random() * 100}vw`;
+            confetti.style.top = '-10px';
+            confetti.style.transform = `scale(${Math.random() * 0.5 + 0.5})`;
+            document.body.appendChild(confetti);
+            
+            // Remove after animation completes
+            setTimeout(() => {
+                confetti.remove();
+            }, 3000);
+        }
+    }
+    
+    // Initialize the quiz
+    startTimer();
+</script>
+{% endblock %}

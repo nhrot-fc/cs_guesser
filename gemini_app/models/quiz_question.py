@@ -6,14 +6,15 @@ from typing import List, Dict, Any, Optional
 from .option import Option
 from .reference import Reference
 from .metadata import QuestionMetadata
-from .enums import ResponseType, ReferenceType
+from .enums import AnswerType, QuestionType
 
 @dataclass
 class QuizQuestion:
     """Complete quiz question structure that matches the JSON schema"""
     question: str
     clues: List[str]
-    type: str  # One of ResponseType values
+    questionType: QuestionType
+    answerType: AnswerType
     options: List[Option]
     metadata: QuestionMetadata
     summary: Optional[str] = None
@@ -21,8 +22,16 @@ class QuizQuestion:
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert the dataclass to a dictionary for JSON serialization"""
-        result = asdict(self)
-        # Handle any special conversion needed for JSON output
+        result = {
+            'question': self.question,
+            'clues': self.clues,
+            'questionType': self.questionType.value,
+            'answerType': self.answerType.value,
+            'options': [opt.to_dict() for opt in self.options],
+            'metadata': self.metadata.to_dict(),
+            'summary': self.summary,
+            'references': [ref.to_dict() for ref in self.references]
+        }
         return result
     
     @classmethod
@@ -43,18 +52,17 @@ class QuizQuestion:
         # Process references
         references = []
         for ref in data.get('references', []):
-            ref_type = ReferenceType(ref.get('type', 'book'))
             references.append(Reference(
-                type=ref_type,
+                type=ref.get('type', 'book'),
                 citation=ref.get('citation', ''),
                 pages=ref.get('pages'),
                 url=ref.get('url')
             ))
-        
         return cls(
             question=data.get('question', ''),
             clues=data.get('clues', []),
-            type=data.get('type', ResponseType.UNIQUE_ANSWER.value),
+            questionType=QuestionType(data.get('questionType', 'conceptual')),
+            answerType=AnswerType(data.get('answerType', 'respuesta_unica')),
             options=options,
             metadata=metadata,
             summary=data.get('summary', None),
@@ -67,7 +75,7 @@ class QuizQuestion:
         for i, clue in enumerate(self.clues, 1):
             result += f"\n{i}. {clue}"
         
-        result += f"\n\nType: {self.type}"
+        result += f"\n\nType: {self.questionType}"
         
         result += "\n\nOptions:"
         for i, opt in enumerate(self.options, 1):

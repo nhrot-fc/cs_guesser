@@ -1,112 +1,4 @@
 # constants.py
-from .models import (
-    ResponseType, 
-    ReferenceType,
-    PromptTemplate
-)
-
-# Estructura principal del prompt
-PROMPT_BASE = """\
-Genera una pregunta de examen de admisión de posgrado en Computer Science con los siguientes parámetros:
-- Tema principal: {topic}
-- Subtema: {subtopic}
-- Nivel de dificultad: {difficulty}/5
-"""
-
-# Plantillas de características extensibles
-FEATURE_TEMPLATES = {
-    "core": {
-        "description": "Estructura básica de la pregunta",
-        "template": """\
-{context}
-Requisitos:
-- Las pistas deben ordenarse de abstractas a concretas
-- Las opciones deben incluir distracciones plausibles
-- Incluir referencias académicas relevantes"""
-    },
-    "metadata": {
-        "description": "Metadatos para clasificación",
-        "fields": {
-            "topic": "str",
-            "subtopic": "str",
-            "difficulty": "int",
-            "tags": "list[str]"
-        }
-    },
-    "references": {
-        "description": "Sistema de referencias académicas",
-        "template": """\
-Referencias requeridas:
-- Libro de texto principal
-- 2 papers seminales
-- Páginas relevantes del libro"""
-    },
-    "pedagogy": {
-        "description": "Elementos pedagógicos",
-        "components": {
-            "learning_objective": "str",
-            "common_misconceptions": "list[str]"
-        }
-    }
-}
-
-# Esquema de validación JSON - actualizado para reflejar la estructura de QuizQuestion
-JSON_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "question": {"type": "string"},
-        "clues": {
-            "type": "array",
-            "items": {"type": "string"},
-            "minItems": 5,
-            "maxItems": 5
-        },
-        "type": {
-            "type": "string",
-            "enum": [t.value for t in ResponseType]
-        },
-        "options": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "label": {"type": "string"},
-                    "answer": {"type": "boolean"}
-                },
-                "required": ["label", "answer"]
-            }
-        },
-        "metadata": {
-            "type": "object",
-            "properties": {
-                "topic": {"type": "string"},
-                "subtopic": {"type": "string"},
-                "difficulty": {"type": "number", "minimum": 1, "maximum": 5},
-                "tags": {
-                    "type": "array",
-                    "items": {"type": "string"}
-                }
-            },
-            "required": ["topic", "subtopic", "difficulty"]
-        },
-        "summary": {"type": "string"},
-        "references": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "type": {"type": "string", "enum": [t.value for t in ReferenceType]},
-                    "citation": {"type": "string"},
-                    "pages": {"type": "string"},
-                    "url": {"type": "string"}
-                },
-                "required": ["type", "citation"]
-            }
-        }
-    },
-    "required": ["question", "clues", "type", "options"]
-}
-
 # Temario y estructura curricular
 SYLLABUS = {
     "core_topics": {
@@ -203,7 +95,7 @@ FULL_EXAMPLE = """\
     {"label": "InsertionSort", "answer": false}
   ],
   "metadata": {
-    "topic": "Algorithms",
+    "topic": "Algoritmos",
     "subtopic": "Sorting",
     "difficulty": 4,
     "tags": ["sorting", "divide-and-conquer", "algorithms"]
@@ -227,11 +119,3 @@ FULL_EXAMPLE = """\
     }
   ]
 }"""
-
-# Create the PromptTemplate instance that can be imported elsewhere
-PROMPT_BUILDER = PromptTemplate(
-    base_template=PROMPT_BASE,
-    feature_templates=FEATURE_TEMPLATES,
-    json_schema=JSON_SCHEMA,
-    full_example=FULL_EXAMPLE
-)

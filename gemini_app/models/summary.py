@@ -1,8 +1,8 @@
 """
 Summary class for quiz question explanations
 """
-from dataclasses import dataclass, field
-from typing import List
+from dataclasses import dataclass, field, asdict
+from typing import List, Dict, Any
 from .reference import Reference
 
 @dataclass
@@ -15,4 +15,10 @@ class Summary:
         result = f"{self.summary}\n\nReferences:"
         for ref in self.references:
             result += f"\n- {ref}"
+        return result
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization"""
+        result = {'summary': self.summary}
+        result['references'] = [ref.to_dict() for ref in self.references]
         return result

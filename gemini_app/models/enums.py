@@ -3,18 +3,22 @@ Enum classes for the gemini_app
 """
 from enum import Enum
 
-class ResponseType(Enum):
-    UNIQUE_ANSWER = "unique_answer"
-    MULTIPLE_ANSWERS = "multiple_answers"
+class JSONSerializableEnum(Enum):
+    """Base class for enum that can be JSON serialized"""
+    
+    def for_json(self):
+        """Return value for JSON serialization"""
+        return self.value
+    
+    def __str__(self):
+        return self.value
 
-class QuestionType(Enum):
+class AnswerType(JSONSerializableEnum):
+    UNIQUE_ANSWER = "respuesta_unica"
+    MULTIPLE_ANSWERS = "respuesta_multiple"
+
+class QuestionType(JSONSerializableEnum):
     CONCEPTUAL = "conceptual"
-    PRACTICAL = "practical"
-    THEORETICAL = "theoretical"
-    PROBLEM_SOLVING = "problem_solving"
-
-class ReferenceType(Enum):
-    BOOK = "book"
-    PAPER = "paper"
-    WEBSITE = "website"
-    LECTURE = "lecture"
+    PRACTICAL = "practica"
+    THEORETICAL = "teorica"
+    PROBLEM_SOLVING = "solucion_de_problemas"
