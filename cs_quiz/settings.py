@@ -41,9 +41,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'tailwind',
-    'theme',
     'gemini_app',
-    'poscomp_quiz',
+    'cs_quiz',
 ]
 
 TAILWIND_APP_NAME = 'theme'

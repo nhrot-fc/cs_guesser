@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POSCOMP Quiz</title>
-    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="{% static 'css/output.css' %}">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center p-4">
@@ -29,6 +29,22 @@
 
         <div class="card-content space-y-6">
             <div class="text-xl font-medium py-2" id="question-text">{{ question.question_text }}</div>
+
+            <!-- Panel de Pistas (nuevo) -->
+            <div id="clues-container" class="bg-gray-800/30 p-4 rounded-md">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="flex items-center text-purple-400">
+                        <span class="mr-2"><i data-lucide="lightbulb" class="h-5 w-5"></i></span>
+                        <h3 class="font-medium">Pistas</h3>
+                    </div>
+                    <button id="show-clue-btn" class="text-sm text-purple-400 hover:text-purple-300">
+                        Mostrar pista
+                    </button>
+                </div>
+                <div id="clues-list" class="space-y-2">
+                    <!-- Las pistas se mostrarán aquí -->
+                </div>
+            </div>
 
             <div class="space-y-3" id="options-container">
                 {% for option in question.options %}
@@ -78,49 +94,62 @@
         let totalAnswered = 0;
         let accuracy = 0;
         let correctIndex = {{ question.correct_index }};
+        let currentClueIndex = -1; // Ninguna pista mostrada inicialmente
 
-        lucide.createIcons();
-        
-        const optionButtons = document.querySelectorAll('.option-btn');
-        const confirmBtn = document.getElementById('confirm-btn');
-        const resultContainer = document.getElementById('result-container');
-        const resultMessage = document.getElementById('result-message');
-        const resultIcon = document.getElementById('result-icon');
-        const resultText = document.getElementById('result-text');
-        const nextBtn = document.getElementById('next-btn');
-        const scoreElement = document.getElementById('score');
-        const totalAnsweredElement = document.getElementById('total-answered');
-        const accuracyElement = document.getElementById('accuracy');
-        
-    
-        document.getElementById('result-icon').innerHTML = `
-            <i data-lucide="check-circle" class="h-5 w-5"></i>
-        `;
-        document.getElementById('book-icon').innerHTML = `
-            <i data-lucide="book-open" class="h-5 w-5"></i>
-        `;
-        document.getElementById('next-icon').innerHTML = `
-            <i data-lucide="chevron-right" class="h-4 w-4"></i>
-        `;
-        lucide.createIcons();
+        // Asegurar que los iconos estén disponibles
+        function initializeIcons() {
+            document.getElementById('result-icon').innerHTML = `
+                <i data-lucide="check-circle" class="h-5 w-5"></i>
+            `;
+            document.getElementById('book-icon').innerHTML = `
+                <i data-lucide="book-open" class="h-5 w-5"></i>
+            `;
+            document.getElementById('next-icon').innerHTML = `
+                <i data-lucide="chevron-right" class="h-4 w-4"></i>
+            `;
+            lucide.createIcons();
+        }
 
-        optionButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                optionButtons.forEach(btn => {
-                    btn.classList.remove('border-purple-500', 'bg-purple-950/30');
-                    btn.classList.add('border-gray-700');
-                });
-                
-                this.classList.remove('border-gray-700');
-                this.classList.add('border-purple-500', 'bg-purple-950/30');
-                
-                selectedOption = parseInt(this.getAttribute('data-index'));
-                
-                confirmBtn.disabled = false;
+        // Inicializar la aplicación
+        function initialize() {
+            console.log('Inicializando aplicación quiz...');
+            console.log('Pregunta cargada:', currentQuestion);
+            initializeIcons();
+            setupEventListeners();
+        }
+
+        // Configurar todos los event listeners
+        function setupEventListeners() {
+            // Botones de opciones
+            document.querySelectorAll('.option-btn').forEach(button => {
+                button.addEventListener('click', handleOptionClick);
             });
-        });
+            
+            // Botón confirmar respuesta
+            document.getElementById('confirm-btn').addEventListener('click', handleConfirmClick);
+            
+            // Botón siguiente pregunta
+            document.getElementById('next-btn').addEventListener('click', handleNextClick);
+            
+            // Botón de pistas
+            document.getElementById('show-clue-btn').addEventListener('click', showNextClue);
+        }
 
-        confirmBtn.addEventListener('click', function() {
+        function handleOptionClick() {
+            document.querySelectorAll('.option-btn').forEach(btn => {
+                btn.classList.remove('border-purple-500', 'bg-purple-950/30');
+                btn.classList.add('border-gray-700');
+            });
+            
+            this.classList.remove('border-gray-700');
+            this.classList.add('border-purple-500', 'bg-purple-950/30');
+            
+            selectedOption = parseInt(this.getAttribute('data-index'));
+            
+            document.getElementById('confirm-btn').disabled = false;
+        }
+
+        function handleConfirmClick() {
             if (selectedOption === null) return;
             
             showResult();
@@ -130,10 +159,10 @@
                 score++;
             }
             updateStats();
-        });
+        }
 
-        nextBtn.addEventListener('click', function() {
-            fetch('{% url "poscomp_quiz:next_question" %}', {
+        function handleNextClick() {
+            fetch('{% url "cs_quiz:next_question" %}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -149,14 +178,20 @@
                 loadNextQuestion(data);
             })
             .catch(error => console.error('Error:', error));
-        });
+        }
 
         function showResult() {
-            confirmBtn.style.display = 'none';
+            document.getElementById('confirm-btn').style.display = 'none';
             
+            const resultContainer = document.getElementById('result-container');
             resultContainer.classList.remove('hidden');
             
+            const resultMessage = document.getElementById('result-message');
+            const resultText = document.getElementById('result-text');
+            const resultIcon = document.getElementById('result-icon');
+            
             const isCorrect = selectedOption === correctIndex;
+            resultMessage.className = 'flex items-center p-4 rounded-md'; // Resetear clases
             
             if (isCorrect) {
                 resultMessage.classList.add('bg-green-950/30', 'text-green-400');
@@ -167,32 +202,45 @@
                 resultText.textContent = 'Incorrecto';
                 resultIcon.innerHTML = '<i data-lucide="x-circle" class="h-5 w-5"></i>';
                 
-                optionButtons[correctIndex].classList.add('border-green-500', 'bg-green-950/30');
+                const optionButtons = document.querySelectorAll('.option-btn');
+                // Destacar la respuesta correcta
+                if (correctIndex >= 0 && correctIndex < optionButtons.length) {
+                    optionButtons[correctIndex].classList.add('border-green-500', 'bg-green-950/30');
+                }
                 
-                if (selectedOption !== null) {
+                // Destacar la respuesta incorrecta seleccionada
+                if (selectedOption !== null && selectedOption >= 0 && selectedOption < optionButtons.length) {
                     optionButtons[selectedOption].classList.add('border-red-500', 'bg-red-950/30');
                 }
             }
             
-            optionButtons.forEach(btn => {
+            document.querySelectorAll('.option-btn').forEach(btn => {
                 btn.disabled = true;
             });
+            
+            // Mostrar todas las pistas al revelar la respuesta
+            showAllClues();
             
             lucide.createIcons();
         }
 
         function updateStats() {
-            scoreElement.textContent = score;
-            totalAnsweredElement.textContent = totalAnswered;
+            document.getElementById('score').textContent = score;
+            document.getElementById('total-answered').textContent = totalAnswered;
             if (totalAnswered > 0) {
                 accuracy = Math.round((score / totalAnswered) * 100);
             }
-            accuracyElement.textContent = accuracy;
+            document.getElementById('accuracy').textContent = accuracy;
         }
 
         function loadNextQuestion(question) {
+            console.log('Cargando nueva pregunta:', question);
             currentQuestion = question;
             correctIndex = question.correct_index;
+            
+            // Resetear el índice de pistas
+            currentClueIndex = -1;
+            document.getElementById('clues-list').innerHTML = '';
             
             document.getElementById('general-topic').textContent = question.general_topic;
             document.getElementById('specific-topic').textContent = question.specific_topic;
@@ -201,6 +249,7 @@
             document.getElementById('explanation').textContent = question.explanation;
             document.getElementById('question-id').textContent = question.id;
             
+            // Actualizar la clase del badge según dificultad
             const difficultyBadge = document.getElementById('difficulty');
             difficultyBadge.className = 'badge'; 
             if (question.difficulty === 'Fácil') {
@@ -211,6 +260,8 @@
                 difficultyBadge.classList.add('border-red-600', 'text-red-400');
             }
             
+            // Actualizar opciones
+            const optionButtons = document.querySelectorAll('.option-btn');
             optionButtons.forEach((btn, index) => {
                 if (index < question.options.length) {
                     btn.innerHTML = `<span class="mr-2">${String.fromCharCode(65 + index)}.</span> ${question.options[index]}`;
@@ -223,9 +274,50 @@
             
             selectedOption = null;
             
-            resultContainer.classList.add('hidden');
-            confirmBtn.style.display = 'block';
-            confirmBtn.disabled = true;
+            document.getElementById('result-container').classList.add('hidden');
+            document.getElementById('confirm-btn').style.display = 'block';
+            document.getElementById('confirm-btn').disabled = true;
+        }
+
+        function showNextClue() {
+            if (!currentQuestion || !currentQuestion.clues || currentQuestion.clues.length === 0) {
+                return;
+            }
+            
+            if (currentClueIndex < currentQuestion.clues.length - 1) {
+                currentClueIndex++;
+                const clue = currentQuestion.clues[currentClueIndex];
+                const clueElement = document.createElement('div');
+                clueElement.className = 'p-2 border-l-2 border-purple-500 pl-3 text-gray-300 animate-fadeIn';
+                clueElement.textContent = clue;
+                document.getElementById('clues-list').appendChild(clueElement);
+                
+                // Deshabilitar el botón si ya se mostraron todas las pistas
+                if (currentClueIndex === currentQuestion.clues.length - 1) {
+                    document.getElementById('show-clue-btn').textContent = 'Todas las pistas mostradas';
+                    document.getElementById('show-clue-btn').disabled = true;
+                    document.getElementById('show-clue-btn').classList.add('opacity-50');
+                }
+            }
+        }
+        
+        function showAllClues() {
+            if (!currentQuestion || !currentQuestion.clues) return;
+            
+            const cluesList = document.getElementById('clues-list');
+            cluesList.innerHTML = '';
+            
+            currentQuestion.clues.forEach(clue => {
+                const clueElement = document.createElement('div');
+                clueElement.className = 'p-2 border-l-2 border-purple-500 pl-3 text-gray-300';
+                clueElement.textContent = clue;
+                cluesList.appendChild(clueElement);
+            });
+            
+            currentClueIndex = currentQuestion.clues.length - 1;
+            document.getElementById('show-clue-btn').textContent = 'Todas las pistas mostradas';
+            document.getElementById('show-clue-btn').disabled = true;
+            document.getElementById('show-clue-btn').classList.add('opacity-50');
         }
 
         function getCookie(name) {
@@ -242,6 +334,9 @@
             }
             return cookieValue;
         }
+        
+        // Inicializar al cargar la página
+        document.addEventListener('DOMContentLoaded', initialize);
     </script>
 </body>
 </html>
