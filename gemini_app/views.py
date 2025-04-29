@@ -12,7 +12,6 @@ from .constants import (
     JSON_SCHEMA, 
     FULL_EXAMPLE, 
     SYLLABUS,
-    DifficultyLevel,
     QuestionType
 )
 
@@ -27,6 +26,38 @@ curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:g
     }]
    }'
 """
+
+def generate_complete_prompt(topic, subtopic, difficulty):
+    """
+    Generate a complete prompt by combining all necessary components from constants.
+    
+    Args:
+        topic (str): Main topic for the quiz question
+        subtopic (str): Subtopic for the quiz question
+        difficulty (int): Difficulty level (1-5)
+        
+    Returns:
+        str: Complete formatted prompt ready for Gemini API
+    """
+    # Format the base prompt with topic, subtopic and difficulty
+    prompt = PROMPT_BASE.format(
+        topic=topic,
+        subtopic=subtopic if subtopic else "General",
+        difficulty=difficulty
+    )
+    
+    # Add core features with standard challenging context
+    prompt += "\n\n" + FEATURE_TEMPLATES["core"]["template"].format(
+        context="Genera una pregunta desafiante que pruebe la comprensión profunda del tema."
+    )
+    
+    # Add references requirements
+    prompt += "\n\n" + FEATURE_TEMPLATES["references"]["template"]
+    
+    # Add JSON schema and example
+    prompt += f"\n\nDevuelve la respuesta únicamente en este formato JSON:\n{json.dumps(JSON_SCHEMA, indent=2)}\n\nEjemplo:\n{FULL_EXAMPLE}"
+    
+    return prompt
 
 def gemini_request(request):
     # Configure the API key
@@ -44,31 +75,16 @@ def gemini_request(request):
         subtopic = random.choice(SYLLABUS["core_topics"][topic])
     
     # Get difficulty level (1-5) with a default of INTERMEDIATE (3)
-    difficulty_param = request.GET.get('difficulty', str(DifficultyLevel.INTERMEDIATE.value))
+    difficulty_param = request.GET.get('difficulty', 3)
     try:
-        difficulty = int(difficulty_param)
-        if difficulty not in [1, 2, 3, 4, 5]:
-            difficulty = DifficultyLevel.INTERMEDIATE.value
+        difficulty_param = int(difficulty_param)
+        if difficulty_param < 1 or difficulty_param > 5:
+            raise ValueError("Difficulty must be between 1 and 5")
     except ValueError:
-        difficulty = DifficultyLevel.INTERMEDIATE.value
+        return JsonResponse({"error": "Invalid difficulty level"}, status=400)
     
-    # Construct the base prompt using the updated constants
-    prompt = PROMPT_BASE.format(
-        topic=topic,
-        subtopic=subtopic if subtopic else "General",
-        difficulty=difficulty
-    )
-    
-    # Add feature templates
-    prompt += "\n\n" + FEATURE_TEMPLATES["core"]["template"].format(
-        context="Genera una pregunta desafiante que pruebe la comprensión profunda del tema."
-    )
-    
-    # Add references requirements
-    prompt += "\n\n" + FEATURE_TEMPLATES["references"]["template"]
-    
-    # Instruct on JSON format and provide example
-    prompt += f"\n\nDevuelve la respuesta únicamente en este formato JSON:\n{json.dumps(JSON_SCHEMA, indent=2)}\n\nEjemplo:\n{FULL_EXAMPLE}"
+    # Generate the complete prompt using our helper function
+    prompt = generate_complete_prompt(topic, subtopic, difficulty_param)
     
     # Generate content
     try:
@@ -106,7 +122,7 @@ def gemini_request(request):
                     quiz_data["metadata"] = {
                         "topic": topic,
                         "subtopic": subtopic if subtopic else "General",
-                        "difficulty": difficulty
+                        "difficulty": difficulty_param
                     }
                 
                 return JsonResponse(quiz_data)

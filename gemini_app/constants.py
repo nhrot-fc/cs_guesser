@@ -1,11 +1,6 @@
 # constants.py
 from enum import Enum
 
-class DifficultyLevel(Enum):
-    BASIC = 1
-    INTERMEDIATE = 3
-    ADVANCED = 5
-
 class QuestionType(Enum):
     UNIQUE_ANSWER = "unique_answer"
     MULTIPLE_ANSWERS = "multiple_answers"
@@ -107,87 +102,77 @@ JSON_SCHEMA = {
 SYLLABUS = {
     "core_topics": {
         "Matemática": [
-            "Álgebra Linear",
-            "Análise Combinatória",
+            "Álgebra Lineal",
+            "Análisis Combinatorio",
             "Cálculo Diferencial e Integral",
-            "Geometria Analítica",
+            "Geometría Analítica",
             "Lógica Matemática",
             "Matemática Discreta",
-            "Probabilidade e Estatística"
+            "Probabilidad y Estadística",
+            # Subtemas de Álgebra Lineal
+            "Sistemas de Ecuaciones Lineales",
+            "Espacios Vectoriales",
+            "Transformaciones Lineales",
+            "Autovalores/Autovectores",
+            "Teorema Espectral",
+            # Subtemas de Cálculo
+            "Límites y Continuidad",
+            "Derivadas y Aplicaciones",
+            "Integración Numérica",
+            "Funciones Multivariadas",
+            "Optimización con Lagrange"
         ],
-        "Algorithms": [
-            "Complexity Analysis",
-            "Graph Theory",
-            "Dynamic Programming",
-            "Análise Assintótica",
+        "Algoritmos": [
+            "Análisis de Complejidad",
+            "Teoría de Grafos",
+            "Programación Dinámica",
+            "Análisis Asintótico",
             "Notación Big O/Omega/Theta",
             "Algoritmos Recursivos e Iterativos"
         ],
         "Sistemas": [
-            "Operating Systems",
-            "Computer Architecture",
-            "Distributed Systems",
-            "Arquitetura de Computadores",
-            "Circuitos Digitais",
-            "Redes de Computadores"
+            "Sistemas Operativos",
+            "Arquitectura de Computadoras",
+            "Sistemas Distribuidos",
+            "Circuitos Digitales",
+            "Redes de Computadoras",
+            # Subtemas de Arquitectura
+            "Memorias y Procesadores",
+            "Lenguaje de Ensamblador",
+            "Arquitecturas RISC/CISC",
+            "Paralelismo y Pipeline",
+            # Subtemas de Redes
+            "Protocolos de Comunicación",
+            "Arquitectura de Redes",
+            "Seguridad y Autenticación",
+            "Desempeño de Redes"
         ],
-        "AI/ML": [
-            "Supervised Learning",
-            "Neural Networks",
-            "Natural Language Processing",
-            "Lógica Fuzzy",
-            "Redes Neurais",
-            "Processamento de Linguagem Natural"
+        "IA/ML": [
+            "Aprendizaje Supervisado",
+            "Redes Neuronales",
+            "Procesamiento de Lenguaje Natural",
+            "Lógica Difusa"
         ],
         "Bases de Datos": [
-            "Modelagem de Dados",
-            "SGBD Arquitetura",
-            "Bancos Distribuídos",
-            "Mineração de Dados"
+            "Modelado de Datos",
+            "Arquitectura de SGBD",
+            "Bases de Datos Distribuidas",
+            "Minería de Datos"
         ],
-        "Engenharia de Software": [
-            "Ciclo de Vida de Software",
-            "Engenharia de Requisitos",
-            "Garantia de Qualidade",
-            "Testes e Validação"
+        "Ingeniería de Software": [
+            "Ciclo de Vida del Software",
+            "Ingeniería de Requisitos",
+            "Garantía de Calidad",
+            "Pruebas y Validación"
         ],
-        "Teoria da Computação": [
-            "Linguagens Formais",
-            "Autômatos e Computabilidade",
-            "Complexidade Computacional",
+        "Teoría de la Computación": [
+            "Lenguajes Formales",
+            "Autómatas y Computabilidad",
+            "Complejidad Computacional",
             "Problemas NP-Completos"
         ]
-    },
-    "subtopics_detail": {
-        "Álgebra Linear": [
-            "Sistemas de Equações Lineares",
-            "Espaços Vetoriais",
-            "Transformações Lineares",
-            "Autovalores/Autovetores",
-            "Teorema Espectral"
-        ],
-        "Cálculo Diferencial e Integral": [
-            "Limites e Continuidade",
-            "Derivadas e Aplicações",
-            "Integração Numérica",
-            "Funções Multivariadas",
-            "Otimização com Lagrange"
-        ],
-        "Arquitetura de Computadores": [
-            "Memórias e Processadores",
-            "Linguagem de Montagem",
-            "Arquiteturas RISC/CISC",
-            "Paralelismo e Pipeline"
-        ],
-        "Redes de Computadores": [
-            "Protocolos de Comunicação",
-            "Arquitetura de Redes",
-            "Segurança y Autenticación",
-            "Desempenho de Redes"
-        ]
-    },
+    }
 }
-
 
 # Ejemplo completo
 FULL_EXAMPLE = """\
@@ -213,6 +198,7 @@ FULL_EXAMPLE = """\
     "subtopic": "Sorting",
     "difficulty": 4
   },
+  "summary" : "El algoritmo MergeSort utiliza la técnica de divide y vencerás para ordenar listas. Divide la lista en mitades, ordena cada mitad y luego combina los resultados.",
   "references": [
     {
       "type": "book",
