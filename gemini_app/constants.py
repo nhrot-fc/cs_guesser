@@ -1,9 +1,9 @@
 # constants.py
-from enum import Enum
-
-class QuestionType(Enum):
-    UNIQUE_ANSWER = "unique_answer"
-    MULTIPLE_ANSWERS = "multiple_answers"
+from .models import (
+    ResponseType, 
+    ReferenceType,
+    PromptTemplate
+)
 
 # Estructura principal del prompt
 PROMPT_BASE = """\
@@ -29,7 +29,8 @@ Requisitos:
         "fields": {
             "topic": "str",
             "subtopic": "str",
-            "curriculum_tags": "list[str]"
+            "difficulty": "int",
+            "tags": "list[str]"
         }
     },
     "references": {
@@ -49,7 +50,7 @@ Referencias requeridas:
     }
 }
 
-# Esquema de validación JSON
+# Esquema de validación JSON - actualizado para reflejar la estructura de QuizQuestion
 JSON_SCHEMA = {
     "type": "object",
     "properties": {
@@ -62,7 +63,7 @@ JSON_SCHEMA = {
         },
         "type": {
             "type": "string",
-            "enum": [t.value for t in QuestionType]
+            "enum": [t.value for t in ResponseType]
         },
         "options": {
             "type": "array",
@@ -80,18 +81,26 @@ JSON_SCHEMA = {
             "properties": {
                 "topic": {"type": "string"},
                 "subtopic": {"type": "string"},
-                "difficulty": {"type": "number", "minimum": 1, "maximum": 5}
-            }
+                "difficulty": {"type": "number", "minimum": 1, "maximum": 5},
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                }
+            },
+            "required": ["topic", "subtopic", "difficulty"]
         },
+        "summary": {"type": "string"},
         "references": {
             "type": "array",
             "items": {
                 "type": "object",
                 "properties": {
-                    "type": {"type": "string", "enum": ["book", "paper"]},
+                    "type": {"type": "string", "enum": [t.value for t in ReferenceType]},
                     "citation": {"type": "string"},
-                    "pages": {"type": "string"}
-                }
+                    "pages": {"type": "string"},
+                    "url": {"type": "string"}
+                },
+                "required": ["type", "citation"]
             }
         }
     },
@@ -174,7 +183,7 @@ SYLLABUS = {
     }
 }
 
-# Ejemplo completo
+# Ejemplo completo - actualizado para reflejar la estructura completa de QuizQuestion
 FULL_EXAMPLE = """\
 {
   "question": "¿Qué algoritmo utiliza divide y vencerás para ordenar con complejidad O(n log n)?",
@@ -196,14 +205,33 @@ FULL_EXAMPLE = """\
   "metadata": {
     "topic": "Algorithms",
     "subtopic": "Sorting",
-    "difficulty": 4
+    "difficulty": 4,
+    "tags": ["sorting", "divide-and-conquer", "algorithms"]
   },
-  "summary" : "El algoritmo MergeSort utiliza la técnica de divide y vencerás para ordenar listas. Divide la lista en mitades, ordena cada mitad y luego combina los resultados.",
+  "summary": "El algoritmo MergeSort utiliza la técnica de divide y vencerás para ordenar listas. Divide la lista en mitades, ordena cada mitad y luego combina los resultados.",
   "references": [
     {
       "type": "book",
       "citation": "Cormen, T. H., et al. 'Introduction to Algorithms, 3rd ed'",
       "pages": "30-35"
+    },
+    {
+      "type": "paper",
+      "citation": "Von Neumann, J. 'Theory of Self-reproducing Automata'",
+      "pages": "120-125"
+    },
+    {
+      "type": "website",
+      "citation": "Geeksforgeeks - Merge Sort Algorithm",
+      "url": "https://www.geeksforgeeks.org/merge-sort/"
     }
   ]
 }"""
+
+# Create the PromptTemplate instance that can be imported elsewhere
+PROMPT_BUILDER = PromptTemplate(
+    base_template=PROMPT_BASE,
+    feature_templates=FEATURE_TEMPLATES,
+    json_schema=JSON_SCHEMA,
+    full_example=FULL_EXAMPLE
+)

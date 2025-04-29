@@ -7,12 +7,14 @@ import json
 import re
 from enum import Enum
 from .constants import (
-    PROMPT_BASE, 
-    FEATURE_TEMPLATES, 
-    JSON_SCHEMA, 
-    FULL_EXAMPLE, 
-    SYLLABUS,
-    QuestionType
+    ResponseType, 
+    QuestionType,
+    ReferenceType,
+    QuizQuestion,
+    Option,
+    Reference,
+    QuestionMetadata,
+    PROMPT_BUILDER
 )
 
 """GEMINI API REQUEST EXAMPLE:
@@ -26,38 +28,6 @@ curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:g
     }]
    }'
 """
-
-def generate_complete_prompt(topic, subtopic, difficulty):
-    """
-    Generate a complete prompt by combining all necessary components from constants.
-    
-    Args:
-        topic (str): Main topic for the quiz question
-        subtopic (str): Subtopic for the quiz question
-        difficulty (int): Difficulty level (1-5)
-        
-    Returns:
-        str: Complete formatted prompt ready for Gemini API
-    """
-    # Format the base prompt with topic, subtopic and difficulty
-    prompt = PROMPT_BASE.format(
-        topic=topic,
-        subtopic=subtopic if subtopic else "General",
-        difficulty=difficulty
-    )
-    
-    # Add core features with standard challenging context
-    prompt += "\n\n" + FEATURE_TEMPLATES["core"]["template"].format(
-        context="Genera una pregunta desafiante que pruebe la comprensión profunda del tema."
-    )
-    
-    # Add references requirements
-    prompt += "\n\n" + FEATURE_TEMPLATES["references"]["template"]
-    
-    # Add JSON schema and example
-    prompt += f"\n\nDevuelve la respuesta únicamente en este formato JSON:\n{json.dumps(JSON_SCHEMA, indent=2)}\n\nEjemplo:\n{FULL_EXAMPLE}"
-    
-    return prompt
 
 def gemini_request(request):
     # Configure the API key
@@ -83,8 +53,13 @@ def gemini_request(request):
     except ValueError:
         return JsonResponse({"error": "Invalid difficulty level"}, status=400)
     
-    # Generate the complete prompt using our helper function
-    prompt = generate_complete_prompt(topic, subtopic, difficulty_param)
+    # Generate prompt using the PROMPT_BUILDER from constants
+    prompt = PROMPT_BUILDER.build_prompt(
+        topic=topic, 
+        subtopic=subtopic, 
+        difficulty=difficulty_param,
+        include_features=["core", "references"]
+    )
     
     # Generate content
     try:
@@ -100,32 +75,33 @@ def gemini_request(request):
             
             try:
                 # Parse the JSON response
-                quiz_data = json.loads(json_text)
+                raw_quiz_data = json.loads(json_text)
                 
-                # Ensure the response has all required fields based on the new schema
-                required_fields = JSON_SCHEMA.get("required", [])
+                # Convert raw JSON to QuizQuestion object
+                try:
+                    quiz_question = QuizQuestion.from_dict(raw_quiz_data)
+                    
+                    # If certain fields are missing, enrich the data
+                    if not hasattr(quiz_question, 'metadata') or not quiz_question.metadata:
+                        quiz_question.metadata = QuestionMetadata(
+                            topic=topic,
+                            subtopic=subtopic if subtopic else "General",
+                            difficulty=difficulty_param,
+                            tags=[]
+                        )
+                    
+                    # If options are missing, generate them
+                    if not quiz_question.options or len(quiz_question.options) == 0:
+                        correct_answer = extract_correct_answer(raw_quiz_data)
+                        if correct_answer:
+                            quiz_question.options = generate_options(correct_answer, topic, quiz_question.type)
+                    
+                    # Convert back to dictionary for JSON response
+                    return JsonResponse(quiz_question.to_dict())
+                except Exception as e:
+                    # If QuizQuestion creation fails, return the raw data
+                    return JsonResponse(raw_quiz_data)
                 
-                for field in required_fields:
-                    if field not in quiz_data:
-                        if field == "options" and "type" in quiz_data:
-                            # Generate options if not provided but we have a question type
-                            correct_answer = extract_correct_answer(quiz_data)
-                            if correct_answer:
-                                quiz_data["options"] = generate_options_from_schema(correct_answer, topic, quiz_data.get("type", QuestionType.UNIQUE_ANSWER.value))
-                            else:
-                                return JsonResponse({"error": f"Cannot generate options without an answer"}, status=400)
-                        else:
-                            return JsonResponse({"error": f"Missing required field: {field}"}, status=400)
-                
-                # Add metadata if missing
-                if "metadata" not in quiz_data:
-                    quiz_data["metadata"] = {
-                        "topic": topic,
-                        "subtopic": subtopic if subtopic else "General",
-                        "difficulty": difficulty_param
-                    }
-                
-                return JsonResponse(quiz_data)
             except json.JSONDecodeError:
                 # If JSON parsing fails, return the raw text
                 return JsonResponse({"error": "Failed to parse JSON", "raw_response": response.text}, status=500)
@@ -148,21 +124,21 @@ def extract_correct_answer(quiz_data):
     
     return None
 
-def generate_options_from_schema(correct_answer, topic, question_type=QuestionType.UNIQUE_ANSWER.value):
-    """Generate options according to the JSON schema format"""
+def generate_options(correct_answer, topic, question_type=ResponseType.UNIQUE_ANSWER.value):
+    """Generate options with the Option dataclass"""
     # These are topic-categorized distractors for more contextually relevant options
     distractor_options = {
-        "Algorithms": [
+        "Algoritmos": [
             "Quick Sort", "Merge Sort", "Heap Sort", "Bubble Sort", "Insertion Sort",
             "Binary Search", "Linear Search", "Hash Table", "B-Tree", "AVL Tree",
             "O(n)", "O(log n)", "O(n²)", "O(1)", "O(n log n)"
         ],
-        "Systems": [
+        "Sistemas": [
             "Process Scheduling", "Memory Management", "File System", "Deadlock Prevention", 
             "Cache Coherence", "Virtual Memory", "Paging", "RAID", "Thread Synchronization",
             "Mutex", "Semaphore", "Monitor", "Pipeline", "Superscalar Architecture"
         ],
-        "AI/ML": [
+        "IA/ML": [
             "Decision Tree", "Random Forest", "Gradient Descent", "Backpropagation",
             "Convolutional Neural Network", "Recurrent Neural Network", "LSTM", "Transformer",
             "Reinforcement Learning", "Supervised Learning", "Unsupervised Learning",
@@ -182,23 +158,23 @@ def generate_options_from_schema(correct_answer, topic, question_type=QuestionTy
     distractors = distractor_options.get(topic, distractor_options["default"])
     
     # For multiple answers type, we need to format differently
-    is_multiple = question_type == QuestionType.MULTIPLE_ANSWERS.value
+    is_multiple = question_type == ResponseType.MULTIPLE_ANSWERS.value
     
     # Create a list of option objects according to the schema
-    options = [{"label": correct_answer, "answer": True}]
+    options = [Option(label=correct_answer, answer=True)]
     
     # For multiple answers, potentially make more than one answer correct
     if is_multiple and random.random() > 0.5:
         # Add another correct answer 25% of the time for multiple answer questions
-        options.append({"label": f"Alternative correct answer for {correct_answer}", "answer": True})
+        options.append(Option(label=f"Alternative correct answer for {correct_answer}", answer=True))
     
     # Add distractors (incorrect options)
     num_distractors = 4 if not is_multiple else 3
     while len(options) < num_distractors + 1:
         distractor = random.choice(distractors)
         # Check if this distractor is already in our options
-        if not any(option["label"] == distractor for option in options):
-            options.append({"label": distractor, "answer": False})
+        if not any(option.label == distractor for option in options):
+            options.append(Option(label=distractor, answer=False))
     
     # Shuffle the options
     random.shuffle(options)
