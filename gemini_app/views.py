@@ -2,6 +2,19 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from google import generativeai as genai
 import os
+import random
+import json
+import re
+from enum import Enum
+from .constants import (
+    PROMPT_BASE, 
+    FEATURE_TEMPLATES, 
+    JSON_SCHEMA, 
+    FULL_EXAMPLE, 
+    SYLLABUS,
+    DifficultyLevel,
+    QuestionType
+)
 
 """GEMINI API REQUEST EXAMPLE:
 
@@ -22,13 +35,155 @@ def gemini_request(request):
     # For Gemini 2.0 Flash
     model = genai.GenerativeModel('gemini-2.0-flash')
     
-    # Generate content
-    response = model.generate_content("Write a poem about AI")
+    # Get request parameters or use defaults
+    topic = request.GET.get('topic', random.choice(list(SYLLABUS["core_topics"].keys())))
+    subtopic = request.GET.get('subtopic', None)
     
-    # Handle the response
-    if response and hasattr(response, 'text'):
-        return JsonResponse({"response": response.text})
-    else:
-        return JsonResponse({"error": "Failed to generate response"}, status=500)
+    # If topic is provided but subtopic isn't, randomly select a subtopic from that topic
+    if topic in SYLLABUS["core_topics"] and not subtopic:
+        subtopic = random.choice(SYLLABUS["core_topics"][topic])
+    
+    # Get difficulty level (1-5) with a default of INTERMEDIATE (3)
+    difficulty_param = request.GET.get('difficulty', str(DifficultyLevel.INTERMEDIATE.value))
+    try:
+        difficulty = int(difficulty_param)
+        if difficulty not in [1, 2, 3, 4, 5]:
+            difficulty = DifficultyLevel.INTERMEDIATE.value
+    except ValueError:
+        difficulty = DifficultyLevel.INTERMEDIATE.value
+    
+    # Construct the base prompt using the updated constants
+    prompt = PROMPT_BASE.format(
+        topic=topic,
+        subtopic=subtopic if subtopic else "General",
+        difficulty=difficulty
+    )
+    
+    # Add feature templates
+    prompt += "\n\n" + FEATURE_TEMPLATES["core"]["template"].format(
+        context="Genera una pregunta desafiante que pruebe la comprensión profunda del tema."
+    )
+    
+    # Add references requirements
+    prompt += "\n\n" + FEATURE_TEMPLATES["references"]["template"]
+    
+    # Instruct on JSON format and provide example
+    prompt += f"\n\nDevuelve la respuesta únicamente en este formato JSON:\n{json.dumps(JSON_SCHEMA, indent=2)}\n\nEjemplo:\n{FULL_EXAMPLE}"
+    
+    # Generate content
+    try:
+        response = model.generate_content(prompt)
+        
+        # Handle the response
+        if response and hasattr(response, 'text'):
+            # Extract JSON from the response text
+            json_text = response.text
+            json_match = re.search(r'```(?:json)?(.*?)```', json_text, re.DOTALL)
+            if json_match:
+                json_text = json_match.group(1).strip()
+            
+            try:
+                # Parse the JSON response
+                quiz_data = json.loads(json_text)
+                
+                # Ensure the response has all required fields based on the new schema
+                required_fields = JSON_SCHEMA.get("required", [])
+                
+                for field in required_fields:
+                    if field not in quiz_data:
+                        if field == "options" and "type" in quiz_data:
+                            # Generate options if not provided but we have a question type
+                            correct_answer = extract_correct_answer(quiz_data)
+                            if correct_answer:
+                                quiz_data["options"] = generate_options_from_schema(correct_answer, topic, quiz_data.get("type", QuestionType.UNIQUE_ANSWER.value))
+                            else:
+                                return JsonResponse({"error": f"Cannot generate options without an answer"}, status=400)
+                        else:
+                            return JsonResponse({"error": f"Missing required field: {field}"}, status=400)
+                
+                # Add metadata if missing
+                if "metadata" not in quiz_data:
+                    quiz_data["metadata"] = {
+                        "topic": topic,
+                        "subtopic": subtopic if subtopic else "General",
+                        "difficulty": difficulty
+                    }
+                
+                return JsonResponse(quiz_data)
+            except json.JSONDecodeError:
+                # If JSON parsing fails, return the raw text
+                return JsonResponse({"error": "Failed to parse JSON", "raw_response": response.text}, status=500)
+        else:
+            return JsonResponse({"error": "Failed to generate response"}, status=500)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
-# Create your views here.
+def extract_correct_answer(quiz_data):
+    """Extract the correct answer from the quiz data"""
+    # Check if there's a direct answer field (old format)
+    if "answer" in quiz_data:
+        return quiz_data["answer"]
+    
+    # Check in options for the one marked as answer=true (new format)
+    if "options" in quiz_data:
+        for option in quiz_data["options"]:
+            if option.get("answer", False):
+                return option.get("label")
+    
+    return None
+
+def generate_options_from_schema(correct_answer, topic, question_type=QuestionType.UNIQUE_ANSWER.value):
+    """Generate options according to the JSON schema format"""
+    # These are topic-categorized distractors for more contextually relevant options
+    distractor_options = {
+        "Algorithms": [
+            "Quick Sort", "Merge Sort", "Heap Sort", "Bubble Sort", "Insertion Sort",
+            "Binary Search", "Linear Search", "Hash Table", "B-Tree", "AVL Tree",
+            "O(n)", "O(log n)", "O(n²)", "O(1)", "O(n log n)"
+        ],
+        "Systems": [
+            "Process Scheduling", "Memory Management", "File System", "Deadlock Prevention", 
+            "Cache Coherence", "Virtual Memory", "Paging", "RAID", "Thread Synchronization",
+            "Mutex", "Semaphore", "Monitor", "Pipeline", "Superscalar Architecture"
+        ],
+        "AI/ML": [
+            "Decision Tree", "Random Forest", "Gradient Descent", "Backpropagation",
+            "Convolutional Neural Network", "Recurrent Neural Network", "LSTM", "Transformer",
+            "Reinforcement Learning", "Supervised Learning", "Unsupervised Learning",
+            "K-means Clustering", "Principal Component Analysis", "Support Vector Machine"
+        ],
+        # Default fallback options if topic isn't recognized
+        "default": [
+            "Binary Search Tree", "Queue", "Stack", "Heap", "Linked List",
+            "O(n)", "O(log n)", "O(n²)", "O(1)", "O(n log n)",
+            "SQL", "NoSQL", "MongoDB", "PostgreSQL", "Redis",
+            "Breadth-First Search", "Depth-First Search", "Dijkstra's Algorithm", 
+            "A* Algorithm", "Bellman-Ford Algorithm"
+        ]
+    }
+    
+    # Get the appropriate distractors for the topic
+    distractors = distractor_options.get(topic, distractor_options["default"])
+    
+    # For multiple answers type, we need to format differently
+    is_multiple = question_type == QuestionType.MULTIPLE_ANSWERS.value
+    
+    # Create a list of option objects according to the schema
+    options = [{"label": correct_answer, "answer": True}]
+    
+    # For multiple answers, potentially make more than one answer correct
+    if is_multiple and random.random() > 0.5:
+        # Add another correct answer 25% of the time for multiple answer questions
+        options.append({"label": f"Alternative correct answer for {correct_answer}", "answer": True})
+    
+    # Add distractors (incorrect options)
+    num_distractors = 4 if not is_multiple else 3
+    while len(options) < num_distractors + 1:
+        distractor = random.choice(distractors)
+        # Check if this distractor is already in our options
+        if not any(option["label"] == distractor for option in options):
+            options.append({"label": distractor, "answer": False})
+    
+    # Shuffle the options
+    random.shuffle(options)
+    return options
