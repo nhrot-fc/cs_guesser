@@ -76,6 +76,8 @@ def index(request):
         
         # Reset the increment_pending flag when rendering a question page
         request.session['increment_pending'] = False
+        # Reset the answer_recorded flag for new question page loads
+        request.session['answer_recorded'] = False
         request.session.modified = True
         
         q = request.session['questions'][request.session['current_question_index']]
@@ -94,6 +96,11 @@ def index(request):
 @require_http_methods(["POST"])
 def submit_answer(request):
     try:
+        # Verificar si ya se registró esta respuesta para evitar duplicación
+        if request.session.get('answer_recorded', False):
+            # Si ya se registró, simplemente devolver los datos actuales
+            return JsonResponse({'success': True, 'metrics': request.session.get('metrics', {})})
+            
         data = json.loads(request.body)
         is_correct = data.get('is_correct', False)
         # Use Metrics dataclass for updating session metrics
@@ -101,6 +108,11 @@ def submit_answer(request):
         metrics_obj.record_answer(is_correct)
         updated_metrics = metrics_obj.to_dict()
         request.session['metrics'] = updated_metrics
+        
+        # Marcar que la respuesta ha sido registrada
+        request.session['answer_recorded'] = True
+        request.session.modified = True
+        
         return JsonResponse({'success': True, 'metrics': updated_metrics})
     except Exception as e:
         logger.error(f"Error processing answer: {e}", exc_info=True)
@@ -117,6 +129,9 @@ def next_question(request):
         request.session['current_question_index'] = request.session.get('current_question_index', 0) + 1
         # Set flag to indicate we've incremented
         request.session['increment_pending'] = True
+    
+    # Reset the answer_recorded flag for the new question
+    request.session['answer_recorded'] = False
     
     # Save the session to ensure changes are persisted
     request.session.modified = True

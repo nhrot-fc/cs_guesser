@@ -142,6 +142,22 @@
     .pulse-slow {
         animation: pulseSlow 2s ease-in-out infinite;
     }
+    @keyframes pulseFast {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    /* Timer styles */
+    #timer {
+        transition: color 0.3s ease;
+    }
+    .timer-warning {
+        color: #fcd34d !important; /* Amarillo para advertencia */
+        animation: pulseSlow 1s ease-in-out infinite !important;
+    }
+    .timer-danger {
+        color: #ef4444 !important; /* Rojo para tiempo crítico */
+        animation: pulseFast 0.5s ease-in-out infinite !important;
+    }
     /* Reset button styling */
     .reset-btn {
         font-weight: 600;
@@ -275,6 +291,63 @@
         height: 2rem;
         font-size: 1rem;
     }
+
+    /* Efecto Rainbow para la racha */
+    @keyframes rainbow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    .streak-text {
+        font-weight: bold;
+        text-shadow: 0 0 3px rgba(0,0,0,0.8);
+    }
+    .streak-rainbow-1 {
+        color: white;
+    }
+    .streak-rainbow-2 {
+        color: #fdfd96; /* Amarillo claro */
+    }
+    .streak-rainbow-3 {
+        color: #77dd77; /* Verde claro */
+    }
+    .streak-rainbow-4 {
+        color: #aec6cf; /* Azul claro */
+    }
+    .streak-rainbow-5 {
+        color: #b19cd9; /* Púrpura claro */
+    }
+    .streak-rainbow-6 {
+        color: #ffb347; /* Naranja pastel */
+    }
+    .streak-rainbow-7 {
+        color: #ff6961; /* Rojo pastel */
+    }
+    .streak-rainbow-8 {
+        color: #cb99c9; /* Morado claro */
+    }
+    .streak-rainbow-9 {
+        color: #fdfd88; /* Amarillo brillante */
+        text-shadow: 0 0 5px rgba(255,255,0,0.3);
+    }
+    .streak-rainbow-10 {
+        background: linear-gradient(to right, 
+            #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: rainbow 2s linear infinite;
+        text-shadow: 0 0 8px rgba(255,255,255,0.3);
+        font-weight: 900;
+    }
+
+    /* Mejorar visibilidad de los valores numéricos */
+    .stats-value {
+        color: white;
+        font-weight: bold;
+        text-shadow: 0 0 3px rgba(0,0,0,0.8);
+    }
 </style>
 {% endblock %}
 
@@ -287,18 +360,18 @@
     <!-- Barra de estadísticas -->
     <div class="flex justify-between items-center mb-6 stats-bar animate-pop-in">
         <div class="bg-deep-space border border-void-purple/30 py-1 px-3 rounded-full stat-item">
-            <span id="timer" class="font-mono text-code-white">00:00</span>
+            <span id="timer" class="font-mono text-code-white">01:30</span>
         </div>
         
         <div class="bg-deep-space border border-void-purple/30 py-1 px-3 rounded-lg stat-item">
             <span class="text-code-white">
-                Puntaje: <span id="score" class="font-bold text-void-purple">{{ metrics.correct_answers|default:"0" }}</span>/<span id="total-answered">{{ metrics.total_answered|default:"0" }}</span>
-                | Precisión: <span id="accuracy" class="font-bold text-void-purple">{{ metrics.accuracy|default:"0" }}</span>%
+                Puntaje: <span id="score" class="stats-value">{{ metrics.correct_answers|default:"0" }}</span>/<span id="total-answered">{{ metrics.total_answered|default:"0" }}</span>
+                | Precisión: <span id="accuracy" class="stats-value">{{ metrics.accuracy|default:"0" }}</span>%
             </span>
         </div>
         
         <div id="streak-indicator" class="bg-gradient-to-r from-void-purple to-deep-void py-1 px-3 rounded-full stat-item {% if metrics.current_streak <= 1 %}hidden{% endif %}">
-            <span class="text-code-white"><span id="streak-count">{{ metrics.current_streak|default:"0" }}</span> en racha!</span>
+            <span class="text-code-white"><span id="streak-count" class="streak-text streak-rainbow-{{ metrics.current_streak|default:'1' }}">{{ metrics.current_streak|default:"0" }}</span> en racha!</span>
         </div>
     </div>
     <div class="text-right mb-4">
@@ -363,7 +436,7 @@
                         class="option-btn w-full text-left py-3 px-4 border border-dark-matter/30 bg-gradient-to-r from-dark-matter/80 to-dark-matter/60 rounded-md flex items-center gap-3 transform transition-all duration-300 ease-out hover:scale-[1.02] shine-effect backdrop-blur-sm animate-slide-in"
                         data-index="{{ forloop.counter0 }}" 
                         data-answer="{{ option.answer|yesno:'true,false' }}">
-                    <span class="inline-flex justify-center items-center letter-badge rounded-full bg-deep-space text-void-purple font-semibold border border-void-purple/50 shadow-md">
+                    <span class="inline-flex shrink-0 justify-center items-center letter-badge rounded-full bg-deep-space text-void-purple font-semibold border border-void-purple/50 shadow-md">
                         {{ forloop.counter|add:"64"|stringformat:"c" }}
                     </span> 
                     <span class="option-text text-code-white">{{ option.label }}</span>
@@ -425,13 +498,15 @@
         const showClueBtn = document.getElementById('show-clue-btn');
         const cluesList = document.querySelectorAll('[id^="clue-"]');
         const streakIndicator = document.getElementById('streak-indicator');
+        const timerElement = document.getElementById('timer');
         
         let selectedOption = null;
         let timerInterval;
-        let seconds = 0;
+        let timeLeft = 90; // 1:30 en segundos
         let shownClues = 0;
         let submissionInProgress = false; // Flag to prevent duplicate submissions
         let navigationInProgress = false; // Flag to prevent duplicate navigation
+        let timerExpired = false; // Flag to track if timer has expired
         
         // Iniciar timer
         startTimer();
@@ -459,20 +534,32 @@
         }
         
         function confirmAnswer() {
-            if (selectedOption === null || submissionInProgress) return;
+            if (selectedOption === null && !timerExpired) return;
+            if (submissionInProgress) return;
             
             // Set flag to prevent duplicate submissions
             submissionInProgress = true;
             confirmBtn.disabled = true;
             
-            const selectedBtn = document.getElementById(`option-${selectedOption}`);
-            const isCorrect = selectedBtn.dataset.answer === 'true';  // ensure answer attribute is string 'true' or 'false'
+            // Stop the timer
+            clearInterval(timerInterval);
+            
+            let isCorrect = false;
+            
+            if (timerExpired) {
+                // Timer expired - mark as incorrect and don't highlight any option
+                selectedOption = null;
+            } else {
+                // User selected an option
+                const selectedBtn = document.getElementById(`option-${selectedOption}`);
+                isCorrect = selectedBtn.dataset.answer === 'true';
+            }
             
             // Mostrar respuesta correcta/incorrecta
             optionButtons.forEach(btn => {
                 if (btn.dataset.answer === 'true') {
                     btn.classList.add('option-correct');
-                } else if (btn === selectedBtn && !isCorrect) {
+                } else if (selectedOption !== null && btn === document.getElementById(`option-${selectedOption}`) && !isCorrect) {
                     btn.classList.add('option-incorrect');
                 }
                 btn.disabled = true;
@@ -483,7 +570,12 @@
                 'flex items-center p-3 rounded-md bg-emerald-900/30 border border-emerald-600' : 
                 'flex items-center p-3 rounded-md bg-red-900/30 border border-red-600';
             resultText.className = isCorrect ? 'font-medium text-emerald-400' : 'font-medium text-red-400';
-            resultText.textContent = isCorrect ? '¡Respuesta correcta! 🎉' : 'Respuesta incorrecta';
+            
+            if (timerExpired) {
+                resultText.textContent = 'Tiempo agotado ⏱️';
+            } else {
+                resultText.textContent = isCorrect ? '¡Respuesta correcta! 🎉' : 'Respuesta incorrecta';
+            }
             
             // Mostrar contenedor de resultado
             resultContainer.classList.remove('hidden');
@@ -498,7 +590,7 @@
                     'X-CSRFToken': getCookie('csrftoken')
                 },
                 body: JSON.stringify({
-                    selected_option: selectedOption,
+                    selected_option: selectedOption !== null ? selectedOption : -1, // -1 indica que no se seleccionó opción (tiempo agotado)
                     is_correct: isCorrect
                 })
             })
@@ -574,20 +666,58 @@
         }
         
         function startTimer() {
+            // Actualizar timer cada segundo
+            updateTimerDisplay();
+            
             timerInterval = setInterval(() => {
-                seconds++;
-                const minutes = Math.floor(seconds / 60);
-                const remainingSeconds = seconds % 60;
-                document.getElementById('timer').textContent = 
-                    `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+                timeLeft--;
+                updateTimerDisplay();
+                
+                // Añadir clases de advertencia cuando quede poco tiempo
+                if (timeLeft <= 30 && timeLeft > 10) {
+                    timerElement.classList.add('timer-warning');
+                } else if (timeLeft <= 10) {
+                    timerElement.classList.remove('timer-warning');
+                    timerElement.classList.add('timer-danger');
+                }
+                
+                // Si el tiempo llega a cero
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    timerExpired = true;
+                    confirmAnswer(); // Marcar automáticamente como incorrecta
+                }
             }, 1000);
+        }
+        
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerElement.textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
         
         function updateMetrics(metrics) {
             document.getElementById('score').textContent = metrics.correct_answers;
             document.getElementById('total-answered').textContent = metrics.total_answered;
             document.getElementById('accuracy').textContent = metrics.accuracy;
-            document.getElementById('streak-count').textContent = metrics.current_streak;
+            
+            // Actualizar contador de racha y aplicar clase rainbow según el valor
+            const streakCount = document.getElementById('streak-count');
+            streakCount.textContent = metrics.current_streak;
+            
+            // Remover todas las clases rainbow previas
+            for (let i = 1; i <= 10; i++) {
+                streakCount.classList.remove(`streak-rainbow-${i}`);
+            }
+            
+            // Añadir la clase rainbow según el valor actual de la racha
+            const streakValue = parseInt(metrics.current_streak);
+            if (streakValue >= 10) {
+                streakCount.classList.add('streak-rainbow-10');
+            } else {
+                streakCount.classList.add(`streak-rainbow-${streakValue}`);
+            }
             
             // Mostrar/ocultar indicador de racha
             if (metrics.current_streak > 1) {
