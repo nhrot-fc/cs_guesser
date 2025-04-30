@@ -57,9 +57,10 @@ class PromptTemplate:
             question_params = PromptTemplate._generate_random_question_params(count)
         
         # Building the prompt
-        prompt = f"Genera preguntas de admisión para un posgrado de computer science con las siguientes características:\n\n"
+        prompt = f"Genera preguntas de admisión para un posgrado (POSCOMP, GeorgiaTech, Harvard, MIT) de computer science con las siguientes características:\n"
         prompt += f"- Número de preguntas: {count}\n"
         prompt += f"- Cantidad de opciones: {5}\n"
+        prompt += f"- Cantidad de respuestas correctas: {1}\n"
         prompt += f"- Cantidad de pistas: {5}\n"
         prompt += f"- Formato de respuesta: JSON\n"
         
