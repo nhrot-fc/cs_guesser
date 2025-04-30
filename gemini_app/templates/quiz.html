@@ -282,7 +282,7 @@
 <div class="container mx-auto max-w-3xl p-4 backdrop-blur-sm">
     <!-- Progress bar -->
     <div class="quiz-progress">
-        <div class="quiz-progress-bar" style="width: {{ question_number|default:1|floatformat:0 }}0%;"></div>
+        <div class="quiz-progress-bar" style="width: {{ question_number|add:1|floatformat:0 }}0%;"></div>
     </div>
     <!-- Barra de estadísticas -->
     <div class="flex justify-between items-center mb-6 stats-bar animate-pop-in">
@@ -314,7 +314,7 @@
             <div class="flex justify-between items-center">
                 <h1 class="text-xl font-bold text-void-purple">{{ question.metadata.topic }}</h1>
                 <div class="bg-dark-matter/50 px-2 py-1 rounded-lg">
-                    <span class="text-ghost-gray">Pregunta <span id="question-id">{{ question_number|default:"1" }}</span>/<span id="total-questions">{{ total_questions|default:"10" }}</span></span>
+                    <span class="text-ghost-gray">Pregunta <span id="question-id">{{ question_number|add:"1" }}</span>/<span id="total-questions">{{ total_questions|default:"10" }}</span></span>
                 </div>
             </div>
             
@@ -388,7 +388,16 @@
                     <h3 class="font-medium text-void-purple mb-1">Explicación</h3>
                     <p class="text-code-white" id="explanation">{{ question.summary }}</p>
                 </div>
-
+                {% if question.references %}
+                <div class="bg-dark-matter/70 border border-dark-matter p-3 rounded-lg mt-2">
+                    <h3 class="font-medium text-void-purple mb-1">Referencias</h3>
+                    <ul class="list-disc list-inside text-code-white">
+                        {% for ref in question.references %}
+                        <li>{{ ref.type }}: {{ ref.title }}{% if ref.authors %} by {{ ref.authors }}{% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
                 <button id="next-btn" class="w-full bg-gradient-to-r from-indigo-500 to-void-purple text-code-white py-3 px-6 rounded-lg font-semibold shadow-lg transform transition-all duration-300 ease-out shine-effect btn-3d hover:shadow-void-purple/50">
                     Siguiente pregunta
                 </button>
@@ -421,6 +430,8 @@
         let timerInterval;
         let seconds = 0;
         let shownClues = 0;
+        let submissionInProgress = false; // Flag to prevent duplicate submissions
+        let navigationInProgress = false; // Flag to prevent duplicate navigation
         
         // Iniciar timer
         startTimer();
@@ -448,7 +459,11 @@
         }
         
         function confirmAnswer() {
-            if (selectedOption === null) return;
+            if (selectedOption === null || submissionInProgress) return;
+            
+            // Set flag to prevent duplicate submissions
+            submissionInProgress = true;
+            confirmBtn.disabled = true;
             
             const selectedBtn = document.getElementById(`option-${selectedOption}`);
             const isCorrect = selectedBtn.dataset.answer === 'true';  // ensure answer attribute is string 'true' or 'false'
@@ -474,9 +489,6 @@
             resultContainer.classList.remove('hidden');
             resultContainer.classList.add('fade-in');
             
-            // Desactivar opciones y botón confirmar
-            confirmBtn.disabled = true;
-            
             // Enviar resultado al servidor
             fetch('/submit_answer/', {
                 method: 'POST',
@@ -495,23 +507,54 @@
                 if (data.success) {
                     updateMetrics(data.metrics);
                 }
+                submissionInProgress = false; // Reset the flag after successful submission
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => {
+                console.error('Error:', error);
+                submissionInProgress = false; // Reset the flag even if there's an error
+            });
         }
         
         function goToNextQuestion() {
+            if (navigationInProgress) return;
+            
+            // Set flag to prevent duplicate navigation
+            navigationInProgress = true;
+            
+            // Prevent double-clicks
+            nextBtn.disabled = true;
+            nextBtn.textContent = 'Cargando...';
+
             // Solicitar siguiente pregunta
-            fetch('/next_question/', { credentials: 'same-origin' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.question) {
-                        // Recargar página para mostrar nueva pregunta
-                        window.location.reload();
-                    } else {
-                        console.error('Error al obtener siguiente pregunta:', data.error);
-                    }
-                })
-                .catch(error => console.error('Error:', error));
+            fetch('/next_question/', { 
+                credentials: 'same-origin',
+                headers: {
+                    'Cache-Control': 'no-cache' // Prevent caching
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.question) {
+                    // Instead of redirecting, force a reload to ensure fresh state
+                    window.location.href = '/?t=' + new Date().getTime(); // Add timestamp to prevent cache
+                } else {
+                    console.error('Error al obtener siguiente pregunta:', data.error);
+                    navigationInProgress = false; // Reset flag if we stay on the same page
+                    nextBtn.disabled = false;
+                    nextBtn.textContent = 'Reintentar';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                navigationInProgress = false; // Reset flag if there's an error
+                nextBtn.disabled = false;
+                nextBtn.textContent = 'Reintentar';
+            });
         }
         
         function showNextClue() {

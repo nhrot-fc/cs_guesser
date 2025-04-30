@@ -10,7 +10,7 @@ from dataclasses import dataclass, asdict
 from .controllers.question_controller import GeminiQuestionController
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -66,19 +66,24 @@ def _init_quiz(request):
             request.session['current_question_index'] = 0
         else:
             logger.error("Failed to generate questions")
+            raise Exception("Failed to generate questions")
 
 
 @ensure_csrf_cookie
 def index(request):
-    _init_quiz(request)
-    
     try:
+        _init_quiz(request)
+        
+        # Reset the increment_pending flag when rendering a question page
+        request.session['increment_pending'] = False
+        request.session.modified = True
+        
         q = request.session['questions'][request.session['current_question_index']]
         metrics = request.session['metrics']
         return render(request, 'quiz.html', {
             'question': q,
             'metrics': metrics,
-            'question_number': request.session['current_question_index'] + 1,
+            'question_number': request.session['current_question_index'],
             'total_questions': len(request.session['questions'])
         })
     except Exception as e:
@@ -104,15 +109,27 @@ def submit_answer(request):
 
 @require_http_methods(["GET"])
 def next_question(request):
-    # Move to next question and re-init if batch exhausted
-    request.session['current_question_index'] = request.session.get('current_question_index', 0) + 1
+    print(f"NEXT QUESTION - Current question index: {request.session.get('current_question_index', 0)}")
+    
+    # Check if the increment flag is set to avoid double increments
+    if not request.session.get('increment_pending', False):
+        # Move to next question
+        request.session['current_question_index'] = request.session.get('current_question_index', 0) + 1
+        # Set flag to indicate we've incremented
+        request.session['increment_pending'] = True
+    
+    # Save the session to ensure changes are persisted
+    request.session.modified = True
+    
+    # Re-init quiz if needed (batch exhausted)
     _init_quiz(request)
+    
     q = request.session['questions'][request.session['current_question_index']]
     metrics = request.session['metrics']
     return JsonResponse({
         'question': q,
         'metrics': metrics,
-        'question_number': request.session['current_question_index'] + 1,
+        'question_number': request.session['current_question_index'],
         'total_questions': len(request.session['questions'])
     })
 

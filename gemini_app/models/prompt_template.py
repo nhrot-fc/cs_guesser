@@ -89,7 +89,6 @@ class PromptTemplate:
             "Responde solamente con el JSON de las preguntas generadas.\n"
         )
         
-        print(f"Prompt for question generation:\n{prompt}")
         return prompt
     
     @staticmethod
@@ -106,15 +105,14 @@ class PromptTemplate:
         params_list = []
         
         # Extract topics from SYLLABUS structure
-        core_topics = SYLLABUS["core_topics"]
-        topic_names = list(core_topics.keys())
+        topic_names = list(SYLLABUS.keys())
         
         for _ in range(count):
             # Select random topic from the SYLLABUS
             topic = random.choice(topic_names)
             
             # Get subtopics for the selected topic and choose one randomly
-            subtopics = core_topics[topic]
+            subtopics = SYLLABUS[topic]
             subtopic = random.choice(subtopics) if subtopics else "General"
             
             # Create the parameters object

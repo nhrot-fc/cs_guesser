@@ -7,20 +7,13 @@ from typing import Optional, Dict, Any
 @dataclass
 class Reference:
     """Academic reference information"""
-    type: str
-    citation: str
-    pages: Optional[str] = None
-    url: Optional[str] = None
+    type: Optional[str] = None
+    title: Optional[str] = None
+    authors: Optional[str] = None
     
-    def __str__(self):
-        result = f"{self.citation}"
-        if self.pages:
-            result += f", pp. {self.pages}"
-        return result
+    def __str__(self) -> str:
+        return f"{self.type}: {self.title} by {self.authors}" if self.title else "No title provided"
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
-        result = asdict(self)
-        # Convert enum to string for JSON serialization
-        result['type'] = self.type
-        return result
+        return asdict(self)

@@ -19,6 +19,9 @@ class Summary:
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
-        result = {'summary': self.summary}
-        result['references'] = [ref.to_dict() for ref in self.references]
+        result = {'summary': self.summary, 'references': []}
+        
+        for ref in self.references:
+            result['references'].append(ref.to_dict())
+        
         return result

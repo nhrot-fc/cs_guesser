@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="32" height="32">
+  <!-- Fondo circular -->
+  <circle cx="50" cy="50" r="48" fill="#120F1A" stroke="#251E38" stroke-width="2"/>
+  
+  <!-- Símbolo de código (llaves) -->
+  <path d="M30 30 L20 50 L30 70" stroke="#7F5AF0" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M70 30 L80 50 L70 70" stroke="#7F5AF0" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Signo de interrogación -->
+  <path d="M45 40 C45 35, 55 35, 55 40 C55 50, 45 45, 45 55 L45 60" stroke="#05F2AF" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <circle cx="45" cy="70" r="2.5" fill="#05F2AF"/>
+</svg> 

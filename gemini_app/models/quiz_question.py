@@ -54,9 +54,8 @@ class QuizQuestion:
         for ref in data.get('references', []):
             references.append(Reference(
                 type=ref.get('type', 'book'),
-                citation=ref.get('citation', ''),
-                pages=ref.get('pages'),
-                url=ref.get('url')
+                title=ref.get('title', ''),
+                authors=ref.get('authors', ''),
             ))
         return cls(
             question=data.get('question', ''),

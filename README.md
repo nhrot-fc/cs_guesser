@@ -99,7 +99,7 @@ Example response:
 
 ```
 cs_quiz_project/
-├── cs_quiz/              # Django project settings
+├── cs_quiz_project/              # Django project settings
 ├── gemini_app/           # Main application
 │   ├── constants.py      # Prompt templates and configuration
 │   ├── models.py         # Data models
