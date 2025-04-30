@@ -11,7 +11,7 @@ from gemini_app.models.enums import (
     AnswerType,
 )
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import random
 
 @dataclass
@@ -24,8 +24,6 @@ class QuestionParameters:
     difficulty: int
     question_type: QuestionType
     response_type: AnswerType
-    options_count: int = 5
-    clues_count: int = 5
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -41,7 +39,7 @@ class PromptTemplate:
     """Structure for building prompts with various components"""
     
     @staticmethod
-    def get_prompt_template(count: int = 5, question_params: List[QuestionParameters] = None) -> str:
+    def get_prompt_template(count: int = 5, question_params: Optional[List[QuestionParameters]] = None) -> str:
         """
         Returns the base prompt template for generating quiz questions.
         This template is used to create structured prompts for the Gemini API.
@@ -59,7 +57,12 @@ class PromptTemplate:
             question_params = PromptTemplate._generate_random_question_params(count)
         
         # Building the prompt
-        prompt = f"Genera {count} preguntas de admisión para un posgrado de computer science con las siguientes características:\n\n"
+        prompt = f"Genera preguntas de admisión para un posgrado de computer science con las siguientes características:\n\n"
+        prompt += f"- Número de preguntas: {count}\n"
+        prompt += f"- Cantidad de opciones: {5}\n"
+        prompt += f"- Cantidad de pistas: {5}\n"
+        prompt += f"- Formato de respuesta: JSON\n"
+        
         
         # Add question specifications
         for i, params in enumerate(question_params):
@@ -68,9 +71,6 @@ class PromptTemplate:
             prompt += f"- Subtema: {params.subtopic}\n"
             prompt += f"- Dificultad: {params.difficulty} (escala 1-5)\n"
             prompt += f"- Tipo de pregunta: {params.question_type.value}\n"
-            prompt += f"- Tipo de respuesta: {params.response_type.value}\n"
-            prompt += f"- Número de opciones: {params.options_count}\n"
-            prompt += f"- Número de pistas: {params.clues_count}\n"
         
         # Add format instructions
         prompt += (
@@ -88,6 +88,7 @@ class PromptTemplate:
             "Responde solamente con el JSON de las preguntas generadas.\n"
         )
         
+        print(f"Prompt for question generation:\n{prompt}")
         return prompt
     
     @staticmethod
@@ -121,9 +122,7 @@ class PromptTemplate:
                 subtopic=subtopic,
                 difficulty=random.randint(1, 5),
                 question_type=random.choice(list(QuestionType)),
-                response_type=random.choice(list(AnswerType)),
-                options_count=random.randint(4, 6),
-                clues_count=5  # Fixed at 5 per requirements
+                response_type=AnswerType.UNIQUE_ANSWER,
             )
             
             params_list.append(params)

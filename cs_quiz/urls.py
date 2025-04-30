@@ -18,12 +18,18 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.shortcuts import redirect
 from gemini_app import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.index, name='index'),
-    path('check/', views.check, name='check'),
+    path('submit_answer/', views.submit_answer, name='submit_answer'),
+    path('next_question/', views.next_question, name='next_question'),
+    path('get_metrics/', views.get_metrics, name='get_metrics'),
+    path('reset_metrics/', views.reset_metrics, name='reset_metrics'),
+    path('clear_session/', views.clear_session, name='clear_session'),
+    path('refresh/', lambda request: redirect('/?refresh=1'), name='refresh'),
 ]
 
 # Añadir configuración de archivos estáticos en desarrollo

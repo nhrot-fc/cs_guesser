@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ["./gemini_app/**/*.{html,js}", "./templates/**/*.html"],
+  content: ["./gemini_app/**/*.{html,js}", "./templates/**/*.html", "./gemini_app/templates/base.html", "./gemini_app/templates/quiz.html"],
   theme: {
     extend: {
       colors: {

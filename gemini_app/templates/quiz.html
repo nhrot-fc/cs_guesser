@@ -3,356 +3,550 @@
 
 {% block extra_css %}
 <style>
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-        100% { transform: scale(1); }
+    /* Animaciones y transiciones */
+    .fade-in {
+        opacity: 0;
+        animation: fadeIn 0.3s forwards;
     }
     @keyframes fadeIn {
-        0% { opacity: 0; }
-        100% { opacity: 1; }
+        to { opacity: 1; }
     }
-    @keyframes slideIn {
-        0% { transform: translateY(20px); opacity: 0; }
-        100% { transform: translateY(0); opacity: 1; }
+    
+    /* Estilos para las opciones */
+    .option-selected {
+        border-color: #8b5cf6 !important;
+        background-color: rgba(30, 27, 37, 0.9) !important;
     }
-    .animate-pulse { animation: pulse 2s infinite; }
-    .animate-fadeIn { animation: fadeIn 0.5s ease-out; }
-    .animate-slideIn { animation: slideIn 0.5s ease-out; }
-    .streak-indicator { 
-        transition: all 0.3s ease;
+    .option-correct {
+        border-color: #10b981 !important;
+        background-color: rgba(16, 185, 129, 0.1) !important;
     }
-    .confetti {
-        position: fixed;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        animation: fall 3s ease-in forwards;
-        z-index: 1000;
-        pointer-events: none;
+    .option-incorrect {
+        border-color: #ef4444 !important;
+        background-color: rgba(239, 68, 68, 0.1) !important;
     }
-    @keyframes fall {
-        to { transform: translateY(100vh) rotate(720deg); }
+
+    /* Estilos adicionales para mejorar estética minimalista y responsividad */
+    :root {
+        --primary-color: #8b5cf6;
+        --background-color: #1e1b25;
+        --card-bg: #25212a;
+        --border-color: #4b4a54;
+        --accent-color: #10b981;
+        --error-color: #ef4444;
+        --text-color: #f5f5f5;
+    }
+
+    body {
+        background-color: var(--background-color);
+        color: var(--text-color);
+    }
+
+    .stats-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    .stats-bar .stat-item {
+        flex: 1;
+        min-width: 120px;
+        text-align: center;
+        background: linear-gradient(135deg, var(--primary-color), #661ae6);
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        transition: transform 0.3s ease;
+    }
+    .stats-bar .stat-item:hover {
+        transform: translateY(-4px) scale(1.05);
+    }
+
+    .quiz-card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+        transition: box-shadow 0.3s ease;
+        border-radius: 0.5rem;
+    }
+    .quiz-card:hover {
+        box-shadow: 0 6px 12px rgba(0,0,0,0.6);
+    }
+
+    #options-container .option-btn {
+        transition: background-color 0.2s, border-color 0.2s;
+    }
+    #options-container .option-btn:hover {
+        background-color: rgba(30,27,37,0.8);
+        border-color: var(--primary-color);
+    }
+    #options-container .option-btn:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(139,92,246,0.5);
+    }
+
+    #confirm-btn, #next-btn {
+        transition: background-color 0.2s, transform 0.1s;
+    }
+    #confirm-btn:hover:not(:disabled), #next-btn:hover {
+        background-color: var(--primary-color);
+        transform: translateY(-1px);
+    }
+    #confirm-btn:active:not(:disabled), #next-btn:active {
+        transform: translateY(0);
+    }
+    #confirm-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    #result-container p {
+        line-height: 1.6;
+    }
+
+    @media (max-width: 640px) {
+        .container {
+            padding: 1rem;
+        }
+        .stats-bar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .quiz-card {
+            padding: 1rem;
+        }
+        #options-container .option-btn {
+            font-size: 0.9rem;
+        }
+    }
+
+    /* New animations for dynamic effects */
+    @keyframes popIn {
+        0% { opacity: 0; transform: scale(0.95); }
+        60% { opacity: 1; transform: scale(1.02); }
+        100% { transform: scale(1); }
+    }
+    .animate-pop-in {
+        animation: popIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes slideInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-slide-in {
+        animation: slideInUp 0.4s ease-out forwards;
+    }
+    @keyframes pulseSlow {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+    .pulse-slow {
+        animation: pulseSlow 2s ease-in-out infinite;
+    }
+    /* Reset button styling */
+    .reset-btn {
+        font-weight: 600;
+        padding: 0.25rem 0.75rem;
+        border-radius: 0.375rem;
+        background-color: transparent;
+        border: 1px solid var(--error-color);
+        color: var(--error-color);
+        transition: transform 0.3s ease, background-color 0.3s ease;
+    }
+    .reset-btn:hover {
+        background-color: rgba(239, 68, 68, 0.1);
+        transform: translateY(-2px) scale(1.02);
+    }
+
+    /* Shine effect for buttons and cards */
+    @keyframes shine {
+        0% { background-position: -100px; }
+        60% { background-position: 300px; }
+        100% { background-position: 300px; }
+    }
+    .shine-effect {
+        position: relative;
+        overflow: hidden;
+    }
+    .shine-effect::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-position: -100px;
+        transition: background-position 0.5s;
+    }
+    .shine-effect:hover::after {
+        animation: shine 1.2s forwards;
+    }
+    /* Neon effect */
+    .neon-border {
+        box-shadow: 0 0 5px rgba(139,92,246,0.7), 0 0 10px rgba(139,92,246,0.5), inset 0 0 5px rgba(139,92,246,0.2);
+    }
+    /* Floating element effect */
+    @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-8px); }
+        100% { transform: translateY(0px); }
+    }
+    .floating {
+        animation: float 4s ease-in-out infinite;
+    }
+    /* 3D button effects */
+    .btn-3d {
+        transform-style: preserve-3d;
+        perspective: 800px;
+    }
+    .btn-3d:active {
+        transform: translateY(4px) rotateX(10deg);
+    }
+    /* Enhanced Quiz Card */
+    .quiz-card {
+        background: linear-gradient(145deg, #282332, #1e1b25);
+        border: 1px solid rgba(139,92,246,0.2);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5), 0 0 15px rgba(139,92,246,0.2);
+        position: relative;
+        isolation: isolate;
+        overflow: hidden;
+    }
+    .quiz-card::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 60%);
+        z-index: -1;
+    }
+    /* Improved option buttons */
+    #options-container .option-btn {
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        position: relative;
+    }
+    #options-container .option-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 3px;
+        height: 0;
+        background: linear-gradient(to bottom, #8b5cf6, #661ae6);
+        transition: height 0.3s ease;
+    }
+    #options-container .option-btn:hover::before {
+        height: 100%;
+    }
+    /* Progress bar between questions */
+    .quiz-progress {
+        height: 6px;
+        background: rgba(75, 74, 84, 0.3);
+        border-radius: 3px;
+        overflow: hidden;
+        margin: 0 auto 1rem;
+    }
+    .quiz-progress-bar {
+        height: 100%;
+        background: linear-gradient(to right, #8b5cf6, #661ae6);
+        transition: width 0.5s ease;
     }
 </style>
 {% endblock %}
 
 {% block body %}
-<div class="flex items-center justify-center p-4">
-    <!-- Card container with position relative for absolute positioning inside -->
-    <div class="w-full max-w-3xl relative">
-        <!-- Stats bar - top area -->
-        <div class="flex justify-between items-center w-full mb-4">
-            <!-- Timer on left -->
-            <div class="bg-dark-matter border border-void-purple/30 py-2 px-4 rounded-full shadow-lg flex items-center space-x-2">
-                <span id="timer-icon"></span>
-                <span id="timer" class="font-mono font-medium">00:00</span>
-            </div>
-            
-            <!-- Score in center -->
-            <div class="bg-dark-matter border border-void-purple/30 py-2 px-4 rounded-lg shadow-lg flex items-center space-x-2">
-                <span id="score-icon"></span>
-                <div>
-                    Puntaje: <span id="score" class="font-bold text-void-purple">0</span>/<span id="total-answered" class="font-bold">0</span> | 
-                    Accuracy: <span id="accuracy" class="font-bold text-void-purple">0</span>%
+<div class="container mx-auto max-w-3xl p-4 backdrop-blur-sm">
+    <!-- Progress bar -->
+    <div class="quiz-progress">
+        <div class="quiz-progress-bar" style="width: {{ question_number|default:1|floatformat:0 }}0%;"></div>
+    </div>
+    <!-- Barra de estadísticas -->
+    <div class="flex justify-between items-center mb-6 stats-bar animate-pop-in">
+        <div class="bg-deep-space border border-void-purple/30 py-1 px-3 rounded-full stat-item">
+            <span id="timer" class="font-mono text-code-white">00:00</span>
+        </div>
+        
+        <div class="bg-deep-space border border-void-purple/30 py-1 px-3 rounded-lg stat-item">
+            <span class="text-code-white">
+                Puntaje: <span id="score" class="font-bold text-void-purple">{{ metrics.correct_answers|default:"0" }}</span>/<span id="total-answered">{{ metrics.total_answered|default:"0" }}</span>
+                | Precisión: <span id="accuracy" class="font-bold text-void-purple">{{ metrics.accuracy|default:"0" }}</span>%
+            </span>
+        </div>
+        
+        <div id="streak-indicator" class="bg-gradient-to-r from-void-purple to-deep-void py-1 px-3 rounded-full stat-item {% if metrics.current_streak <= 1 %}hidden{% endif %}">
+            <span class="text-code-white"><span id="streak-count">{{ metrics.current_streak|default:"0" }}</span> en racha!</span>
+        </div>
+    </div>
+    <div class="text-right mb-4">
+        <a href="{% url 'clear_session' %}" class="reset-btn neon-border btn-3d floating">
+            Reiniciar Quiz
+        </a>
+    </div>
+    
+    <!-- Tarjeta principal -->
+    <div class="p-6 rounded-2xl transform transition-all duration-500 hover:scale-[1.03] animate-pop-in quiz-card">
+        <!-- Encabezado -->
+        <div class="pb-3 border-b border-dark-matter/80">
+            <div class="flex justify-between items-center">
+                <h1 class="text-xl font-bold text-void-purple">{{ question.metadata.topic }}</h1>
+                <div class="bg-dark-matter/50 px-2 py-1 rounded-lg">
+                    <span class="text-ghost-gray">Pregunta <span id="question-id">{{ question_number|default:"1" }}</span>/<span id="total-questions">{{ total_questions|default:"10" }}</span></span>
                 </div>
             </div>
             
-            <!-- Streak on right -->
-            <div id="streak-indicator" class="bg-gradient-to-r from-void-purple to-deep-void py-2 px-4 rounded-full shadow-lg hidden animate-fadeIn flex items-center space-x-2">
-                <span id="streak-icon"></span>
-                <span class="font-bold"><span id="streak-count">0</span> en racha!</span>
+            <h2 class="text-md font-medium text-code-white">{{ question.metadata.subtopic }}</h2>
+            
+            <!-- Etiquetas -->
+            <div class="flex flex-wrap gap-2 mt-2">
+                <span class="px-2 py-0.5 bg-dark-matter/80 border border-void-purple/50 text-void-purple rounded-full text-xs">
+                    {{ question.questionType }}
+                </span>
+                <span class="px-2 py-0.5 bg-dark-matter/80 border border-void-purple/50 text-void-purple rounded-full text-xs">
+                    {{ question.metadata.difficulty }}
+                </span>
             </div>
         </div>
-    
-        <!-- Main card -->
-        <div class="card w-full bg-dark-matter border border-void-purple/30 p-6 rounded-lg shadow-xl animate-fadeIn">
-            <div class="card-header space-y-2 pb-4 border-b border-dark-matter/80">
+
+        <!-- Contenido -->
+        <div class="my-4 space-y-4">
+            <!-- Pregunta -->
+            <div class="text-lg p-5 bg-dark-matter/70 rounded-lg text-code-white backdrop-blur-sm shadow-inner transform transition-all duration-300 hover:shadow-lg">
+                {{ question.question }}
+            </div>
+
+            <!-- Pistas -->
+            <div id="clues-container" class="bg-dark-matter/70 border border-dark-matter/80 p-4 rounded-lg backdrop-blur-sm shadow-inner">
                 <div class="flex justify-between items-center">
-                    <h1 class="text-2xl font-bold text-void-purple" id="general-topic">{{ question.metadata.topic }}</h1>
-                    
-                    <!-- Question number -->
-                    <div class="flex items-center space-x-1 bg-deep-space/50 px-3 py-1 rounded-lg">
-                        <span id="question-num-icon"></span>
-                        <span class="text-ghost-gray">Pregunta #<span id="question-id">{{ question.metadata.tags.0 }}</span></span>
-                    </div>
+                    <h3 class="text-void-purple">Pistas</h3>
+                    <button id="show-clue-btn" class="text-sm text-void-purple hover:text-deep-void px-3 py-1 rounded-full border border-void-purple/30 transition-all duration-300 hover:bg-void-purple/10">
+                        Mostrar pista
+                    </button>
                 </div>
-                <h2 class="text-lg font-medium text-code-white" id="specific-topic">{{ question.metadata.subtopic }}</h2>
-                <div class="flex flex-wrap items-center gap-2 mt-2">
-                    <span class="badge px-3 py-1 bg-dark-matter/80 border border-void-purple/50 text-void-purple rounded-full flex items-center space-x-1" id="question-type">
-                        <span id="question-type-icon"></span>
-                        <span>{{ question.questionType }}</span>
-                    </span>
-                    <span class="badge px-3 py-1 bg-dark-matter/80 border border-void-purple/50 text-void-purple rounded-full flex items-center space-x-1" id="answer-type">
-                        <span id="answer-type-icon"></span>
-                        <span>{{ question.answerType }}</span>
-                    </span>
-                    <span class="badge px-3 py-1 rounded-full flex items-center space-x-1 bg-dark-matter/80 border-void-purple/50 text-void-purple" id="difficulty">
-                        <span id="difficulty-icon"></span>
-                        <span>{{ question.metadata.difficulty }}</span>
-                    </span>
-                    {% if question.metadata.tags %}
-                    <span class="badge px-3 py-1 bg-deep-space/50 border border-dark-matter text-ghost-gray rounded-full flex items-center space-x-1">
-                        <span id="tag-icon"></span>
-                        <span>{{ question.metadata.tags.0 }}</span>
-                    </span>
+                <div id="clues-list" class="mt-2">
+                    {% for clue in question.clues %}
+                    <p id="clue-{{ forloop.counter0 }}" class="text-code-white hidden p-2 border-l-2 border-void-purple pl-2">{{ clue }}</p>
+                    {% endfor %}
+                    {% if not question.clues %}
+                    <p class="text-ghost-gray italic">No hay pistas disponibles.</p>
                     {% endif %}
                 </div>
             </div>
 
-            <div class="card-content space-y-6 my-6">
-                <div class="text-xl font-medium p-4 bg-deep-space/70 rounded-lg border border-dark-matter shadow-inner" id="question-text">{{ question.question }}</div>
-
-                <!-- Progress -->
-                <div class="w-full bg-deep-space rounded-full h-2.5 overflow-hidden">
-                    <div id="progress-bar" class="bg-gradient-to-r from-void-purple to-cyber-blue h-2.5 rounded-full" style="width: 0%"></div>
-                </div>
-
-                <!-- Panel de Pistas -->
-                <div id="clues-container" class="bg-deep-space/70 border border-dark-matter p-4 rounded-lg shadow-md transition-all">
-                    <div class="flex justify-between items-center mb-2">
-                        <div class="flex items-center text-void-purple">
-                            <span class="mr-2" id="clue-icon"></span>
-                            <h3 class="font-medium">Pistas</h3>
-                        </div>
-                        <button id="show-clue-btn" class="text-sm text-void-purple hover:text-deep-void bg-dark-matter px-3 py-1 rounded-full transition-colors flex items-center">
-                            <span id="show-clue-icon" class="mr-1"></span>
-                            Mostrar pista
-                        </button>
-                    </div>
-                    <div id="clues-list" class="space-y-2">
-                        {% for clue in question.clues %}
-                        <p id="clue-{{ forloop.counter0 }}" class="text-ghost-gray hidden p-2 border-l-2 border-void-purple pl-3 animate-slideIn">{{ clue }}</p>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <div class="space-y-3" id="options-container">
-                    {% for option in question.options %}
-                    <button id="option-{{ forloop.counter0 }}" class="option-btn w-full justify-start text-left h-auto py-3 px-4 transition-all border border-dark-matter hover:border-void-purple bg-deep-space/70 rounded-md flex items-center group hover:bg-dark-matter/80"
-                            data-index="{{ forloop.counter0 }}" data-answer="{{ option.answer }}">
-                        <span class="inline-flex justify-center items-center w-8 h-8 mr-3 rounded-full bg-dark-matter text-void-purple group-hover:bg-void-purple group-hover:text-code-white">{{ forloop.counter|add:"64"|stringformat:"c" }}</span> 
-                        <span class="option-text">{{ option.label }}</span>
-                    </button>
-                    {% endfor %}
-                </div>
-
-                <div id="action-container" class="mt-6">
-                    <button id="confirm-btn" class="w-full bg-gradient-to-r from-void-purple to-deep-void hover:from-deep-void hover:to-deep-void/90 text-code-white py-3 px-4 rounded-md shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100 flex justify-center items-center space-x-2" disabled>
-                        <span id="confirm-icon"></span>
-                        <span>Confirmar respuesta</span>
-                    </button>
-                </div>
-
-                <div id="result-container" class="space-y-4 animate-fadeIn hidden">
-                    <div id="result-message" class="flex items-center p-4 rounded-md shadow-md">
-                        <span id="result-icon" class="mr-2"></span>
-                        <span id="result-text" class="font-medium"></span>
-                    </div>
-
-                    <div class="bg-deep-space/70 border border-dark-matter p-4 rounded-lg shadow-md">
-                        <div class="flex items-center mb-2 text-void-purple">
-                            <span id="book-icon" class="mr-2"></span>
-                            <h3 class="font-medium">Explicación</h3>
-                        </div>
-                        <p class="text-ghost-gray" id="explanation">{{ question.summary }}</p>
-                    </div>
-
-                    <button id="next-btn" class="w-full bg-gradient-to-r from-void-purple to-deep-void hover:from-deep-void hover:to-deep-void/90 text-code-white py-3 px-4 rounded-md shadow-lg transition-all transform hover:scale-[1.02] flex justify-center items-center">
-                        <span>Siguiente pregunta</span>
-                        <span id="next-icon" class="ml-2"></span>
-                    </button>
-                </div>
+            <!-- Opciones -->
+            <div class="space-y-3" id="options-container">
+                {% for option in question.options %}
+                <button id="option-{{ forloop.counter0 }}" 
+                        class="option-btn w-full text-left py-3 px-4 border border-dark-matter/30 bg-gradient-to-r from-dark-matter/80 to-dark-matter/60 rounded-md flex items-center gap-3 transform transition-all duration-300 ease-out hover:scale-[1.02] shine-effect backdrop-blur-sm animate-slide-in"
+                        data-index="{{ forloop.counter0 }}" 
+                        data-answer="{{ option.answer|yesno:'true,false' }}">
+                    <span class="inline-flex justify-center items-center w-7 h-7 rounded-full bg-deep-space text-void-purple text-sm font-semibold border border-void-purple/50 shadow-md">
+                        {{ forloop.counter|add:"64"|stringformat:"c" }}
+                    </span> 
+                    <span class="option-text text-code-white">{{ option.label }}</span>
+                </button>
+                {% endfor %}
             </div>
 
-            <div class="card-footer text-xs text-ghost-gray pt-4 border-t border-dark-matter/80 flex justify-between items-center">
-                <div class="flex items-center space-x-1">
-                    <span id="poscomp-icon"></span>
-                    <span>POSCOMP Quiz</span>
-                </div>
+            <!-- Botón de confirmación -->
+            <div class="mt-4">
+                <button id="confirm-btn" class="w-full bg-gradient-to-r from-indigo-500 to-void-purple text-code-white py-3 px-6 rounded-lg font-semibold shadow-lg transform transition-all duration-300 ease-out shine-effect btn-3d hover:shadow-void-purple/50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Confirmar respuesta
+                </button>
             </div>
+
+            <!-- Resultado (oculto) -->
+            <div id="result-container" class="space-y-3 hidden animate-slide-in">
+                <div id="result-message" class="flex items-center p-3 rounded-md">
+                    <span id="result-text" class="font-medium"></span>
+                </div>
+
+                <div class="bg-dark-matter/70 border border-dark-matter p-3 rounded-lg">
+                    <h3 class="font-medium text-void-purple mb-1">Explicación</h3>
+                    <p class="text-code-white" id="explanation">{{ question.summary }}</p>
+                </div>
+
+                <button id="next-btn" class="w-full bg-gradient-to-r from-indigo-500 to-void-purple text-code-white py-3 px-6 rounded-lg font-semibold shadow-lg transform transition-all duration-300 ease-out shine-effect btn-3d hover:shadow-void-purple/50">
+                    Siguiente pregunta
+                </button>
+            </div>
+        </div>
+
+        <!-- Pie -->
+        <div class="text-xs text-ghost-gray pt-3 border-t border-dark-matter/80 flex justify-between">
+            <div>POSCOMP Quiz</div>
+            <div>Mejor racha: <span class="text-void-purple">{{ metrics.max_streak|default:"0" }}</span></div>
         </div>
     </div>
 </div>
-{% endblock %}
 
 {% block extra_js %}
 <script>
-    // Icons setup
-    document.getElementById('score-icon').innerHTML = '<i data-lucide="trophy" class="h-4 w-4 text-void-purple"></i>';
-    document.getElementById('clue-icon').innerHTML = '<i data-lucide="lightbulb" class="h-5 w-5"></i>';
-    document.getElementById('show-clue-icon').innerHTML = '<i data-lucide="eye" class="h-4 w-4"></i>';
-    document.getElementById('confirm-icon').innerHTML = '<i data-lucide="check-circle" class="h-5 w-5"></i>';
-    document.getElementById('book-icon').innerHTML = '<i data-lucide="book-open" class="h-5 w-5"></i>';
-    document.getElementById('next-icon').innerHTML = '<i data-lucide="arrow-right" class="h-5 w-5"></i>';
-    document.getElementById('poscomp-icon').innerHTML = '<i data-lucide="code" class="h-4 w-4 text-ghost-gray"></i>';
-    document.getElementById('question-num-icon').innerHTML = '<i data-lucide="hash" class="h-4 w-4 text-ghost-gray"></i>';
-    document.getElementById('timer-icon').innerHTML = '<i data-lucide="timer" class="h-4 w-4 text-void-purple"></i>';
-    document.getElementById('streak-icon').innerHTML = '<i data-lucide="flame" class="h-5 w-5 text-code-white"></i>';
-    document.getElementById('question-type-icon').innerHTML = '<i data-lucide="brain" class="h-4 w-4"></i>';
-    document.getElementById('answer-type-icon').innerHTML = '<i data-lucide="check-square" class="h-4 w-4"></i>';
-    document.getElementById('difficulty-icon').innerHTML = '<i data-lucide="bar-chart-2" class="h-4 w-4"></i>';
-    document.getElementById('tag-icon').innerHTML = '<i data-lucide="tag" class="h-4 w-4"></i>';
-    
-    // Variables for quiz functionality
-    let selectedOptionIndex = null;
-    let score = 0;
-    let totalAnswered = 0;
-    let currentStreak = 0;
-    let maxStreak = 0;
-    let cluesShown = 0;
-    let startTime = new Date();
-    let timerInterval;
-    
-    // Setup timer
-    function startTimer() {
-        startTime = new Date();
-        timerInterval = setInterval(updateTimer, 1000);
-    }
-    
-    function updateTimer() {
-        const now = new Date();
-        const diff = Math.floor((now - startTime) / 1000);
-        const minutes = Math.floor(diff / 60).toString().padStart(2, '0');
-        const seconds = (diff % 60).toString().padStart(2, '0');
-        document.getElementById('timer').textContent = `${minutes}:${seconds}`;
-    }
-    
-    // Option selection
-    const optionBtns = document.querySelectorAll('.option-btn');
-    const confirmBtn = document.getElementById('confirm-btn');
-    
-    optionBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            // Reset previously selected option
-            optionBtns.forEach(b => {
-                b.classList.remove('border-void-purple', 'bg-dark-matter/40');
+    document.addEventListener('DOMContentLoaded', function() {
+        // Variables globales
+        const optionButtons = document.querySelectorAll('.option-btn');
+        const confirmBtn = document.getElementById('confirm-btn');
+        const resultContainer = document.getElementById('result-container');
+        const resultMessage = document.getElementById('result-message');
+        const resultText = document.getElementById('result-text');
+        const nextBtn = document.getElementById('next-btn');
+        const showClueBtn = document.getElementById('show-clue-btn');
+        const cluesList = document.querySelectorAll('[id^="clue-"]');
+        const streakIndicator = document.getElementById('streak-indicator');
+        
+        let selectedOption = null;
+        let timerInterval;
+        let seconds = 0;
+        let shownClues = 0;
+        
+        // Iniciar timer
+        startTimer();
+        
+        // Event listeners
+        optionButtons.forEach(btn => {
+            btn.addEventListener('click', selectOption);
+        });
+        
+        confirmBtn.addEventListener('click', confirmAnswer);
+        nextBtn.addEventListener('click', goToNextQuestion);
+        showClueBtn.addEventListener('click', showNextClue);
+        
+        // Funciones
+        function selectOption() {
+            // Eliminar selección previa
+            optionButtons.forEach(btn => btn.classList.remove('option-selected'));
+            
+            // Seleccionar opción actual
+            this.classList.add('option-selected');
+            selectedOption = parseInt(this.dataset.index);
+            
+            // Habilitar botón confirmar
+            confirmBtn.disabled = false;
+        }
+        
+        function confirmAnswer() {
+            if (selectedOption === null) return;
+            
+            const selectedBtn = document.getElementById(`option-${selectedOption}`);
+            const isCorrect = selectedBtn.dataset.answer === 'true';  // ensure answer attribute is string 'true' or 'false'
+            
+            // Mostrar respuesta correcta/incorrecta
+            optionButtons.forEach(btn => {
+                if (btn.dataset.answer === 'true') {
+                    btn.classList.add('option-correct');
+                } else if (btn === selectedBtn && !isCorrect) {
+                    btn.classList.add('option-incorrect');
+                }
+                btn.disabled = true;
             });
             
-            // Set new selected option
-            btn.classList.add('border-void-purple', 'bg-dark-matter/40');
-            selectedOptionIndex = parseInt(btn.dataset.index);
-            confirmBtn.removeAttribute('disabled');
-            confirmBtn.classList.add('animate-pulse');
-        });
-    });
-    
-    // Clue reveal functionality
-    const showClueBtn = document.getElementById('show-clue-btn');
-    const cluesList = document.querySelectorAll('[id^="clue-"]');
-    
-    showClueBtn.addEventListener('click', function() {
-        if (cluesShown < cluesList.length) {
-            document.getElementById(`clue-${cluesShown}`).classList.remove('hidden');
-            cluesShown++;
+            // Actualizar mensaje de resultado
+            resultMessage.className = isCorrect ? 
+                'flex items-center p-3 rounded-md bg-emerald-900/30 border border-emerald-600' : 
+                'flex items-center p-3 rounded-md bg-red-900/30 border border-red-600';
+            resultText.className = isCorrect ? 'font-medium text-emerald-400' : 'font-medium text-red-400';
+            resultText.textContent = isCorrect ? '¡Respuesta correcta! 🎉' : 'Respuesta incorrecta';
             
-            if (cluesShown === cluesList.length) {
-                showClueBtn.disabled = true;
-                showClueBtn.classList.add('opacity-50');
-            }
+            // Mostrar contenedor de resultado
+            resultContainer.classList.remove('hidden');
+            resultContainer.classList.add('fade-in');
+            
+            // Desactivar opciones y botón confirmar
+            confirmBtn.disabled = true;
+            
+            // Enviar resultado al servidor
+            fetch('/submit_answer/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    selected_option: selectedOption,
+                    is_correct: isCorrect
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateMetrics(data.metrics);
+                }
+            })
+            .catch(error => console.error('Error:', error));
         }
-    });
-    
-    // Answer confirmation
-    confirmBtn.addEventListener('click', function() {
-        if (selectedOptionIndex === null) return;
         
-        confirmBtn.classList.remove('animate-pulse');
-        confirmBtn.disabled = true;
+        function goToNextQuestion() {
+            // Solicitar siguiente pregunta
+            fetch('/next_question/', { credentials: 'same-origin' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.question) {
+                        // Recargar página para mostrar nueva pregunta
+                        window.location.reload();
+                    } else {
+                        console.error('Error al obtener siguiente pregunta:', data.error);
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
         
-        const selectedOption = document.getElementById(`option-${selectedOptionIndex}`);
-        const isCorrect = selectedOption.dataset.answer === 'True';
-        
-        totalAnswered++;
-        document.getElementById('total-answered').textContent = totalAnswered;
-        
-        if (isCorrect) {
-            score++;
-            currentStreak++;
-            if (currentStreak > maxStreak) maxStreak = currentStreak;
-            
-            // Show streak indicator
-            if (currentStreak > 1) {
-                document.getElementById('streak-count').textContent = currentStreak;
-                document.getElementById('streak-indicator').classList.remove('hidden');
+        function showNextClue() {
+            if (shownClues < cluesList.length) {
+                const clue = document.getElementById(`clue-${shownClues}`);
+                if (clue) {
+                    clue.classList.remove('hidden');
+                    clue.classList.add('fade-in');
+                    shownClues++;
+                }
                 
-                // Add fire effect based on streak
-                if (currentStreak >= 3) {
-                    createConfetti(20);
+                if (shownClues >= cluesList.length) {
+                    showClueBtn.disabled = true;
+                    showClueBtn.textContent = 'No hay más pistas';
                 }
             }
+        }
+        
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                seconds++;
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                document.getElementById('timer').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+        
+        function updateMetrics(metrics) {
+            document.getElementById('score').textContent = metrics.correct_answers;
+            document.getElementById('total-answered').textContent = metrics.total_answered;
+            document.getElementById('accuracy').textContent = metrics.accuracy;
+            document.getElementById('streak-count').textContent = metrics.current_streak;
             
-            selectedOption.classList.add('border-neon-mint', 'bg-neon-mint/10');
-            const resultMessage = document.getElementById('result-message');
-            resultMessage.classList.add('bg-neon-mint/10', 'border', 'border-neon-mint', 'text-neon-mint');
-            document.getElementById('result-icon').innerHTML = '<i data-lucide="check-circle" class="h-5 w-5 text-neon-mint"></i>';
-            document.getElementById('result-text').textContent = '¡Respuesta correcta!';
-        } else {
-            currentStreak = 0;
-            document.getElementById('streak-indicator').classList.add('hidden');
-            
-            selectedOption.classList.add('border-hot-pink', 'bg-hot-pink/10');
-            
-            // Find and highlight correct answer
-            optionBtns.forEach(btn => {
-                if (btn.dataset.answer === 'True') {
-                    btn.classList.add('border-neon-mint');
+            // Mostrar/ocultar indicador de racha
+            if (metrics.current_streak > 1) {
+                streakIndicator.classList.remove('hidden');
+            } else {
+                streakIndicator.classList.add('hidden');
+            }
+        }
+        
+        // Función para obtener el token CSRF
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
                 }
-            });
-            
-            const resultMessage = document.getElementById('result-message');
-            resultMessage.classList.add('bg-hot-pink/10', 'border', 'border-hot-pink', 'text-hot-pink');
-            document.getElementById('result-icon').innerHTML = '<i data-lucide="x-circle" class="h-5 w-5 text-hot-pink"></i>';
-            document.getElementById('result-text').textContent = 'Respuesta incorrecta';
+            }
+            return cookieValue;
         }
-        
-        // Update score and accuracy
-        document.getElementById('score').textContent = score;
-        const accuracy = Math.round((score / totalAnswered) * 100);
-        document.getElementById('accuracy').textContent = accuracy;
-        
-        // Update progress bar
-        document.getElementById('progress-bar').style.width = `${accuracy}%`;
-        
-        // Show result container
-        document.getElementById('result-container').classList.remove('hidden');
-        
-        // Disable all option buttons
-        optionBtns.forEach(btn => {
-            btn.disabled = true;
-            btn.classList.add('opacity-75');
-        });
-        
-        // Initialize icons in the result section
-        lucide.createIcons();
     });
-    
-    // Next question button
-    document.getElementById('next-btn').addEventListener('click', function() {
-        location.reload(); // For demo purposes - would be replaced with AJAX call
-    });
-    
-    // Confetti effect
-    function createConfetti(numParticles) {
-        const colors = ['#7F5AF0', '#6844E1', '#2CB6F6', '#05F2AF', '#EAEAF2'];
-        
-        for (let i = 0; i < numParticles; i++) {
-            const confetti = document.createElement('div');
-            confetti.classList.add('confetti');
-            confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-            confetti.style.left = `${Math.random() * 100}vw`;
-            confetti.style.top = '-10px';
-            confetti.style.transform = `scale(${Math.random() * 0.5 + 0.5})`;
-            document.body.appendChild(confetti);
-            
-            // Remove after animation completes
-            setTimeout(() => {
-                confetti.remove();
-            }, 3000);
-        }
-    }
-    
-    // Initialize the quiz
-    startTimer();
 </script>
+{% endblock %}
 {% endblock %}

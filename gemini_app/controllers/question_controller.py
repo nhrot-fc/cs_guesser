@@ -47,7 +47,7 @@ class GeminiQuestionController:
         try:
             logger.info(f"Sending request to Gemini API for {count} questions")
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-1.5-flash",
                 contents=prompt,
             )
             logger.debug(f"Response from Gemini API received")
@@ -94,7 +94,10 @@ class GeminiQuestionController:
                 logger.debug(f"Response contains a list with {len(data)} items")
                 for item in data:
                     question = QuizQuestion.from_dict(item)
-                    questions.append(question)
+                    if question.options:
+                        questions.append(question)
+                    else:
+                        logger.error(f"Question {question} does not have options")
             elif isinstance(data, dict):
                 if 'questions' in data:
                     # If the response has a 'questions' key with a list
@@ -106,7 +109,10 @@ class GeminiQuestionController:
                     # If the response is a single question
                     logger.debug("Response contains a single question dictionary")
                     question = QuizQuestion.from_dict(data)
-                    questions.append(question)
+                    if question.options:
+                        questions.append(question)
+                    else:
+                        logger.error(f"Question {question} does not have options")
                     
             logger.info(f"Successfully parsed {len(questions)} questions")
             return questions

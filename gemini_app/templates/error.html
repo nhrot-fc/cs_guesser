@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Error - CS Quiz{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Animaciones */
+    .pulse-error {
+        animation: pulseError 2s infinite;
+    }
+    @keyframes pulseError {
+        0% { opacity: 0.8; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.05); }
+        100% { opacity: 0.8; transform: scale(1); }
+    }
+    
+    @keyframes floatUpDown {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    .animate-float {
+        animation: floatUpDown 4s ease-in-out infinite;
+    }
+    
+    /* Card error style */
+    .error-card {
+        background: linear-gradient(145deg, #282332, #1e1b25);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5), 0 0 15px rgba(239, 68, 68, 0.2);
+        position: relative;
+        isolation: isolate;
+        overflow: hidden;
+    }
+    
+    .error-card::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(239, 68, 68, 0.05) 0%, transparent 60%);
+        z-index: -1;
+    }
+    
+    /* Neon effect for error */
+    .neon-error {
+        text-shadow: 0 0 10px rgba(239, 68, 68, 0.7), 0 0 20px rgba(239, 68, 68, 0.5);
+    }
+    
+    /* Button style */
+    .home-btn {
+        position: relative;
+        overflow: hidden;
+        background-image: linear-gradient(to right, #8b5cf6, #6d28d9);
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+    
+    .home-btn::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+        background-position: -100px;
+        transition: background-position 0.5s;
+    }
+    
+    .home-btn:hover::after {
+        animation: shine 1.2s forwards;
+    }
+    
+    @keyframes shine {
+        0% { background-position: -100px; }
+        60% { background-position: 300px; }
+        100% { background-position: 300px; }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container mx-auto max-w-lg p-4 backdrop-blur-sm">
+    <div class="p-6 rounded-2xl error-card animate-pop-in">
+        <!-- Icon -->
+        <div class="flex justify-center mb-6">
+            <div class="w-24 h-24 rounded-full bg-red-900/30 flex items-center justify-center pulse-error">
+                <span class="text-4xl text-red-500 neon-error">!</span>
+            </div>
+        </div>
+        
+        <!-- Error heading -->
+        <h1 class="text-2xl font-bold text-center mb-4 text-red-500 neon-error">¡Ups! Algo salió mal</h1>
+        
+        <!-- Error message -->
+        <div class="bg-dark-matter/70 p-4 rounded-lg border border-red-500/30 mb-6 backdrop-blur-sm text-center">
+            <p class="text-lg text-code-white">{{ error|default:"Ha ocurrido un error inesperado." }}</p>
+        </div>
+        
+        <!-- Suggestions -->
+        <div class="mb-8 text-center text-ghost-gray">
+            <p class="mb-2">Intenta las siguientes opciones:</p>
+            <ul class="list-disc list-inside text-sm">
+                <li class="animate-float" style="animation-delay: 0s;">Volver a la página de inicio</li>
+                <li class="animate-float" style="animation-delay: 0.5s;">Reiniciar el quiz</li>
+                <li class="animate-float" style="animation-delay: 1s;">Refrescar la página</li>
+            </ul>
+        </div>
+        
+        <!-- Return button -->
+        <a href="{% url 'index' %}" class="block w-full py-3 px-6 rounded-lg text-center text-code-white font-semibold home-btn transform transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg">
+            Volver al Inicio
+        </a>
+    </div>
+    
+    <!-- Footer -->
+    <div class="text-center mt-4 text-sm text-ghost-gray/60">
+        <p>POSCOMP Quiz | Error Code: {{ request.session.session_key|default:"N/A" }}</p>
+    </div>
+</div>
+{% endblock %}
