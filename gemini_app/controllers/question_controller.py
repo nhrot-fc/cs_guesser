@@ -3,8 +3,10 @@ Controller for generating questions using Gemini API
 """
 import json
 import logging
+import threading
+import time
 from google import genai
-from typing import List, Optional
+from typing import List, Optional, Dict
 from ..models.quiz_question import QuizQuestion
 from ..models.prompt_template import PromptTemplate
 import os
@@ -30,40 +32,139 @@ class GeminiQuestionController:
             logger.error(f"Gemini API client initialization failed: {e}")
             raise ValueError(f"Gemini API client initialization failed: {e}")
         
+        # Track generation tasks in progress to avoid duplicates
+        self._generation_tasks = {}
+        self._lock = threading.Lock()
+        
+    def is_generation_in_progress(self, task_id: str) -> bool:
+        """
+        Check if a generation task is already in progress
+        
+        Args:
+            task_id: Unique identifier for the generation task
+            
+        Returns:
+            True if the task is in progress, False otherwise
+        """
+        with self._lock:
+            return task_id in self._generation_tasks
+            
+    def get_generation_status(self, task_id: str) -> Dict:
+        """
+        Get the status of a generation task
+        
+        Args:
+            task_id: Unique identifier for the generation task
+            
+        Returns:
+            Dict with status information
+        """
+        with self._lock:
+            if task_id not in self._generation_tasks:
+                return {
+                    "status": "not_found",
+                    "message": "No generation task found with this ID"
+                }
+            
+            task_info = self._generation_tasks[task_id]
+            return {
+                "status": task_info.get("status", "unknown"),
+                "started_at": task_info.get("started_at", 0),
+                "questions": task_info.get("questions", []),
+                "message": task_info.get("message", ""),
+                "progress": task_info.get("progress", 0)
+            }
+        
     def generate_questions(
         self, 
         count: int,
+        task_id: Optional[str] = None
     ) -> Optional[List[QuizQuestion]]:
         """
         Generate quiz questions using the Gemini API.
         
         Args:
             count: Number of questions to generate
+            task_id: Optional unique identifier for tracking this generation task
             
         Returns:
             List of QuizQuestion objects or None if an error occurs
         """
-        prompt = PromptTemplate.get_prompt_template(count=count)
+        # If no task_id provided, create one
+        task_id = task_id or f"gen_{int(time.time())}"
+        
+        # Check if this task is already in progress
+        with self._lock:
+            if task_id in self._generation_tasks:
+                logger.info(f"Generation task {task_id} already in progress")
+                return None
+            
+            # Register this task as in progress
+            self._generation_tasks[task_id] = {
+                "status": "in_progress",
+                "started_at": time.time(),
+                "progress": 0,
+                "message": "Initializing question generation..."
+            }
+        
         try:
+            with self._lock:
+                self._generation_tasks[task_id]["message"] = "Sending request to Gemini API..."
+                self._generation_tasks[task_id]["progress"] = 10
+            
+            prompt = PromptTemplate.get_prompt_template(count=count)
             logger.info(f"Sending request to Gemini API for {count} questions")
+            
+            with self._lock:
+                self._generation_tasks[task_id]["message"] = "Waiting for Gemini API response..."
+                self._generation_tasks[task_id]["progress"] = 30
+            
             response = self.client.models.generate_content(
                 model="gemini-2.0-flash",
                 contents=prompt,
             )
+            
+            with self._lock:
+                self._generation_tasks[task_id]["message"] = "Processing Gemini response..."
+                self._generation_tasks[task_id]["progress"] = 70
+            
+            # Extract the text content from the response
+            if hasattr(response, 'text'):
+                response_text = response.text or ""
+            else:
+                response_text = str(response)
+                logger.warning(f"Response from Gemini API doesn't have text attribute")
+                
+            with self._lock:
+                self._generation_tasks[task_id]["message"] = "Parsing questions..."
+                self._generation_tasks[task_id]["progress"] = 90
+                
+            questions = self._parse_response(response_text)
+            logger.info(f"Generated {len(questions)} questions")
+            
+            with self._lock:
+                self._generation_tasks[task_id]["status"] = "completed"
+                self._generation_tasks[task_id]["questions"] = [q.to_dict() for q in questions]
+                self._generation_tasks[task_id]["message"] = "Questions generated successfully"
+                self._generation_tasks[task_id]["progress"] = 100
+            
+            return questions
+            
         except Exception as e:
             logger.error(f"Error during API call: {e}")
+            with self._lock:
+                self._generation_tasks[task_id]["status"] = "failed"
+                self._generation_tasks[task_id]["message"] = f"Error: {str(e)}"
             return None
-        
-        # Extract the text content from the response
-        if hasattr(response, 'text'):
-            response_text = response.text or ""
-        else:
-            response_text = str(response)
-            logger.warning(f"Response from Gemini API doesn't have text attribute")
-                
-        questions = self._parse_response(response_text)
-        logger.info(f"Generated {len(questions)} questions")
-        return questions
+        finally:
+            # Keep the task info for status checks, but clean up after some time
+            def cleanup_task():
+                time.sleep(300)  # Keep task info for 5 minutes
+                with self._lock:
+                    if task_id in self._generation_tasks:
+                        del self._generation_tasks[task_id]
+            
+            threading.Thread(target=cleanup_task, daemon=True).start()
     
     def _parse_response(self, response_text: str) -> List[QuizQuestion]:
         """

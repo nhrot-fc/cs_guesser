@@ -30,6 +30,7 @@ urlpatterns = [
     path('reset_metrics/', views.reset_metrics, name='reset_metrics'),
     path('clear_session/', views.clear_session, name='clear_session'),
     path('refresh/', lambda request: redirect('/?refresh=1'), name='refresh'),
+    path('check_generation_status/', views.check_generation_status, name='check_generation_status'),
 ]
 
 # Añadir configuración de archivos estáticos en desarrollo

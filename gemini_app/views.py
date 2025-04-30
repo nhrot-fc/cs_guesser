@@ -5,6 +5,8 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import ensure_csrf_cookie
 import logging
 import json
+import uuid
+import threading
 from dataclasses import dataclass, asdict
 
 from .controllers.question_controller import GeminiQuestionController
@@ -53,44 +55,248 @@ controller = GeminiQuestionController()
 DEFAULT_BATCH_SIZE = 5
 
 
-def _init_quiz(request):
-    # Initialize metrics and fetch a new batch if needed
+# Métodos auxiliares para manejar la generación y gestión de preguntas
+def _ensure_metrics_initialized(request):
+    """
+    Garantiza que las métricas estén inicializadas en la sesión.
+    
+    Args:
+        request: HttpRequest de Django con la sesión activa
+    """
     if 'metrics' not in request.session:
         request.session['metrics'] = Metrics().to_dict()
+        request.session.modified = True
+
+
+def _get_current_question(request):
+    """
+    Obtiene la pregunta actual basada en el índice de la sesión.
+    
+    Args:
+        request: HttpRequest de Django con la sesión activa
+        
+    Returns:
+        dict: La pregunta actual o None si no hay preguntas disponibles
+    """
     questions = request.session.get('questions', [])
     idx = request.session.get('current_question_index', 0)
-    if not questions or idx >= len(questions):
-        new_questions = controller.generate_questions(count=DEFAULT_BATCH_SIZE)
-        if new_questions:
-            request.session['questions'] = [q.to_dict() for q in new_questions]
-            request.session['current_question_index'] = 0
-        else:
-            logger.error("Failed to generate questions")
-            raise Exception("Failed to generate questions")
+    
+    if questions and 0 <= idx < len(questions):
+        return questions[idx]
+    return None
+
+
+def _needs_new_batch(request):
+    """
+    Determina si se necesita generar un nuevo batch de preguntas.
+    
+    Args:
+        request: HttpRequest de Django con la sesión activa
+        
+    Returns:
+        bool: True si se necesita un nuevo batch, False en caso contrario
+    """
+    questions = request.session.get('questions', [])
+    idx = request.session.get('current_question_index', 0)
+    
+    # Necesitamos un nuevo batch si:
+    # 1. No hay preguntas
+    # 2. El índice está fuera de rango
+    return not questions or idx >= len(questions)
+
+
+def _is_generation_in_progress(request):
+    """
+    Verifica si hay una generación de preguntas en progreso.
+    
+    Args:
+        request: HttpRequest de Django con la sesión activa
+        
+    Returns:
+        bool: True si hay una generación en progreso, False en caso contrario
+    """
+    task_id = request.session.get('generation_task_id')
+    return (request.session.get('generation_in_progress', False) and 
+            task_id and 
+            controller.is_generation_in_progress(task_id))
+
+
+def _get_generation_status(request):
+    """
+    Obtiene el estado actual de la generación de preguntas.
+    
+    Args:
+        request: HttpRequest de Django con la sesión activa
+        
+    Returns:
+        dict: Diccionario con el estado de la generación
+    """
+    task_id = request.session.get('generation_task_id')
+    if not task_id:
+        return {
+            'status': 'unknown',
+            'message': 'No generation task in progress'
+        }
+    return controller.get_generation_status(task_id)
+
+
+def _reset_batch(request):
+    """
+    Resetea el batch actual y prepara para uno nuevo.
+    
+    Args:
+        request: HttpRequest de Django con la sesión activa
+    """
+    request.session['questions'] = []
+    request.session['current_question_index'] = 0
+    request.session.modified = True
+    logger.info("Reset batch and prepared for new generation")
+
+
+def _start_question_generation(request):
+    """
+    Inicia la generación de preguntas en un thread separado.
+    
+    Args:
+        request: HttpRequest de Django con la sesión activa
+    """
+    # Generar un nuevo ID de tarea y almacenarlo en la sesión
+    task_id = str(uuid.uuid4())
+    request.session['generation_task_id'] = task_id
+    request.session['generation_in_progress'] = True
+    request.session.modified = True
+    
+    # Iniciar la generación de preguntas en un hilo en segundo plano
+    def generate_questions_task():
+        try:
+            new_questions = controller.generate_questions(count=DEFAULT_BATCH_SIZE, task_id=task_id)
+            if new_questions:
+                # Actualizar la sesión con nuevas preguntas
+                request.session['questions'] = [q.to_dict() for q in new_questions]
+                request.session['current_question_index'] = 0
+                request.session['generation_in_progress'] = False
+                request.session.modified = True
+                logger.info(f"Generated batch of {len(new_questions)} questions successfully")
+            else:
+                logger.error("Failed to generate questions")
+                request.session['generation_error'] = "Failed to generate questions"
+                request.session['generation_in_progress'] = False
+                request.session.modified = True
+        except Exception as e:
+            logger.error(f"Error in question generation thread: {e}", exc_info=True)
+            request.session['generation_error'] = str(e)
+            request.session['generation_in_progress'] = False
+            request.session.modified = True
+    
+    # Iniciar un nuevo hilo solo si vamos a generar preguntas
+    threading.Thread(target=generate_questions_task, daemon=True).start()
+    logger.info(f"Started question generation with task_id: {task_id}")
+
+
+def _init_quiz(request):
+    """
+    Inicializa o actualiza el estado del quiz según sea necesario.
+    
+    Args:
+        request: HttpRequest de Django con la sesión activa
+    """
+    # Inicializar métricas si es necesario
+    _ensure_metrics_initialized(request)
+    
+    # Verificar si necesitamos generar nuevas preguntas
+    if not _needs_new_batch(request):
+        return
+    
+    # Si ya estamos generando preguntas, solo retornar
+    if _is_generation_in_progress(request):
+        return
+    
+    # Resetear el batch si tenemos preguntas pero el índice está fuera de rango
+    questions = request.session.get('questions', [])
+    idx = request.session.get('current_question_index', 0)
+    if questions and idx >= len(questions):
+        _reset_batch(request)
+    
+    # Iniciar la generación de nuevas preguntas
+    _start_question_generation(request)
 
 
 @ensure_csrf_cookie
 def index(request):
     try:
+        # Manejo especial para solicitudes HEAD para evitar disparar la generación de preguntas
+        if request.method == 'HEAD':
+            return render(request, 'base.html', {
+                'loading': True,
+                'message': 'Health check ping received'
+            })
+            
+        # Inicializar el estado del quiz
         _init_quiz(request)
         
-        # Reset the increment_pending flag when rendering a question page
+        # Resetear banderas para esta carga de página
         request.session['increment_pending'] = False
-        # Reset the answer_recorded flag for new question page loads
         request.session['answer_recorded'] = False
         request.session.modified = True
         
-        q = request.session['questions'][request.session['current_question_index']]
-        metrics = request.session['metrics']
+        # Verificar si aún estamos generando preguntas
+        if _is_generation_in_progress(request):
+            status = _get_generation_status(request)
+            # Renderizar una página de carga con información de estado
+            return render(request, 'quiz.html', {
+                'loading': True,
+                'status': status,
+                'metrics': request.session.get('metrics', {}),
+            })
+                
+        # Verificar si hubo un error durante la generación
+        if 'generation_error' in request.session:
+            error = request.session.pop('generation_error')
+            return render(request, 'error.html', {'error': error})
+            
+        # Si tenemos preguntas, renderizar la página del quiz
+        current_question = _get_current_question(request)
+        if current_question:
+            metrics = request.session.get('metrics', {})
+            return render(request, 'quiz.html', {
+                'question': current_question,
+                'metrics': metrics,
+                'question_number': request.session.get('current_question_index', 0),
+                'total_questions': len(request.session.get('questions', []))
+            })
+            
+        # Si llegamos aquí, aún estamos esperando preguntas
         return render(request, 'quiz.html', {
-            'question': q,
-            'metrics': metrics,
-            'question_number': request.session['current_question_index'],
-            'total_questions': len(request.session['questions'])
+            'loading': True,
+            'message': 'Preparing your quiz questions...',
+            'metrics': request.session.get('metrics', {})
         })
+            
     except Exception as e:
         logger.error(f"Error rendering quiz: {e}", exc_info=True)
+        logger.debug(f"Session data: {request.session.items()}")
         return render(request, 'error.html', {'error': str(e)})
+
+
+@require_http_methods(["GET"])
+def check_generation_status(request):
+    """Endpoint para verificar el estado de la generación de preguntas"""
+    status = _get_generation_status(request)
+    
+    # Si la generación está completa, actualizar la sesión
+    if status.get('status') == 'completed' and status.get('questions'):
+        request.session['questions'] = status.get('questions')
+        request.session['current_question_index'] = 0
+        request.session['generation_in_progress'] = False
+        request.session.modified = True
+        
+    # Si la generación falló, registrar el error
+    elif status.get('status') == 'failed':
+        request.session['generation_error'] = status.get('message', 'Unknown error')
+        request.session['generation_in_progress'] = False
+        request.session.modified = True
+        
+    return JsonResponse(status)
 
 
 @require_http_methods(["POST"])
@@ -103,7 +309,7 @@ def submit_answer(request):
             
         data = json.loads(request.body)
         is_correct = data.get('is_correct', False)
-        # Use Metrics dataclass for updating session metrics
+        # Utilizar la clase Metrics para actualizar las métricas de la sesión
         metrics_obj = Metrics.from_dict(request.session.get('metrics', {}))
         metrics_obj.record_answer(is_correct)
         updated_metrics = metrics_obj.to_dict()
@@ -121,31 +327,48 @@ def submit_answer(request):
 
 @require_http_methods(["GET"])
 def next_question(request):
-    print(f"NEXT QUESTION - Current question index: {request.session.get('current_question_index', 0)}")
+    logger.info(f"NEXT QUESTION - Current question index: {request.session.get('current_question_index', 0)}")
     
-    # Check if the increment flag is set to avoid double increments
+    # Verificar si la bandera de incremento está configurada para evitar incrementos dobles
     if not request.session.get('increment_pending', False):
-        # Move to next question
-        request.session['current_question_index'] = request.session.get('current_question_index', 0) + 1
-        # Set flag to indicate we've incremented
+        # Avanzar a la siguiente pregunta
+        current_idx = request.session.get('current_question_index', 0)
+        request.session['current_question_index'] = current_idx + 1
+        # Establecer bandera para indicar que hemos incrementado
         request.session['increment_pending'] = True
+        logger.info(f"Incremented question index to: {current_idx + 1}")
     
-    # Reset the answer_recorded flag for the new question
+    # Resetear la bandera answer_recorded para la nueva pregunta
     request.session['answer_recorded'] = False
-    
-    # Save the session to ensure changes are persisted
     request.session.modified = True
     
-    # Re-init quiz if needed (batch exhausted)
+    # Re-inicializar el quiz si es necesario (batch agotado)
     _init_quiz(request)
     
-    q = request.session['questions'][request.session['current_question_index']]
-    metrics = request.session['metrics']
+    # Verificar si aún estamos generando preguntas
+    if _is_generation_in_progress(request):
+        status = _get_generation_status(request)
+        return JsonResponse({
+            'loading': True,
+            'status': status
+        })
+    
+    # Si las preguntas están listas, devolverlas
+    current_question = _get_current_question(request)
+    if current_question:
+        idx = request.session.get('current_question_index', 0)
+        metrics = request.session.get('metrics', {})
+        return JsonResponse({
+            'question': current_question,
+            'metrics': metrics,
+            'question_number': idx,
+            'total_questions': len(request.session.get('questions', []))
+        })
+    
+    # Si aún no tenemos preguntas
     return JsonResponse({
-        'question': q,
-        'metrics': metrics,
-        'question_number': request.session['current_question_index'],
-        'total_questions': len(request.session['questions'])
+        'loading': True,
+        'message': 'Preparing your next question...'
     })
 
 
@@ -156,7 +379,7 @@ def get_metrics(request):
 
 @require_http_methods(["POST"])
 def reset_metrics(request):
-    # Reset session metrics using Metrics dataclass
+    # Resetear métricas de sesión usando la clase Metrics
     request.session['metrics'] = Metrics().to_dict()
     return JsonResponse({'success': True})
 

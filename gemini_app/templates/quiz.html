@@ -146,6 +146,48 @@
         0%, 100% { opacity: 1; }
         50% { opacity: 0.7; }
     }
+    
+    /* Loading styles */
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+    }
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid rgba(139, 92, 246, 0.3);
+        border-radius: 50%;
+        border-top-color: #8b5cf6;
+        animation: spinner 1s linear infinite;
+    }
+    @keyframes spinner {
+        to {transform: rotate(360deg);}
+    }
+    .progress-bar {
+        width: 100%;
+        height: 12px;
+        background-color: rgba(75, 74, 84, 0.3);
+        border-radius: 6px;
+        margin: 1.5rem 0 1rem;
+        overflow: hidden;
+    }
+    .progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(to right, #8b5cf6, #661ae6);
+        border-radius: 6px;
+        transition: width 0.5s ease-out;
+    }
+    .blink {
+        animation: blink 1.5s ease-in-out infinite;
+    }
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    
     /* Timer styles */
     #timer {
         transition: color 0.3s ease;
@@ -353,6 +395,89 @@
 
 {% block body %}
 <div class="container mx-auto max-w-3xl p-4 backdrop-blur-sm">
+    {% if loading %}
+    <!-- Estado de carga mientras se generan preguntas -->
+    <div class="p-6 rounded-2xl quiz-card">
+        <div class="loading-container">
+            <h2 class="text-xl font-bold text-void-purple mb-3">{{ status.message|default:"Preparando tus preguntas..." }}</h2>
+            
+            <div class="loading-spinner"></div>
+            
+            <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: {{ status.progress|default:'10' }}%;"></div>
+            </div>
+            
+            <p class="text-code-white text-center mt-2">
+                {% if status.message %}
+                    {{ status.message }}
+                {% else %}
+                    {{ message|default:"Estamos generando preguntas de alta calidad para ti. Este proceso puede tardar unos 20 segundos..." }}
+                {% endif %}
+            </p>
+            
+            <p class="text-ghost-gray text-sm mt-4 blink">La página se actualizará automáticamente cuando las preguntas estén listas</p>
+        </div>
+    </div>
+    
+    <!-- Script para polling del estado de generación -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            function checkGenerationStatus() {
+                fetch('/check_generation_status/', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Update the progress bar
+                    const progressBar = document.querySelector('.progress-bar-fill');
+                    if (progressBar) {
+                        progressBar.style.width = `${data.progress || 10}%`;
+                    }
+                    
+                    // Update the status message
+                    const statusMsg = document.querySelector('.loading-container h2');
+                    if (statusMsg && data.message) {
+                        statusMsg.textContent = data.message;
+                    }
+                    
+                    // If generation is complete, reload the page
+                    if (data.status === 'completed') {
+                        window.location.reload();
+                    } 
+                    // If generation failed, show error
+                    else if (data.status === 'failed') {
+                        const container = document.querySelector('.loading-container');
+                        container.innerHTML = `
+                            <div class="bg-red-900/30 border border-red-600 p-4 rounded-md">
+                                <h3 class="text-red-400 font-bold">Error al generar preguntas</h3>
+                                <p class="text-code-white">${data.message || 'Error desconocido'}</p>
+                                <button onclick="window.location.href='/'" class="mt-4 bg-red-600 text-white py-2 px-4 rounded">
+                                    Reintentar
+                                </button>
+                            </div>
+                        `;
+                        return; // Stop polling
+                    }
+                    
+                    // Continue polling
+                    setTimeout(checkGenerationStatus, 1000);
+                })
+                .catch(error => {
+                    console.error('Error checking generation status:', error);
+                    setTimeout(checkGenerationStatus, 2000); // Retry with longer interval
+                });
+            }
+            
+            // Start polling
+            setTimeout(checkGenerationStatus, 1000);
+        });
+    </script>
+    {% else %}
+    <!-- Contenido normal de quiz -->
     <!-- Progress bar -->
     <div class="quiz-progress">
         <div class="quiz-progress-bar" style="width: {{ question_number|add:1|floatformat:0 }}0%;"></div>
@@ -484,10 +609,16 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Si estamos en modo de carga, no necesitamos inicializar la lógica del quiz
+        if (document.querySelector('.loading-container')) {
+            return;
+        }
+        
         // Variables globales
         const optionButtons = document.querySelectorAll('.option-btn');
         const confirmBtn = document.getElementById('confirm-btn');
@@ -631,7 +762,10 @@
                 return response.json();
             })
             .then(data => {
-                if (data.question) {
+                if (data.loading) {
+                    // Si estamos cargando preguntas, redirigir a la página principal
+                    window.location.href = '/?t=' + new Date().getTime();
+                } else if (data.question) {
                     // Instead of redirecting, force a reload to ensure fresh state
                     window.location.href = '/?t=' + new Date().getTime(); // Add timestamp to prevent cache
                 } else {
