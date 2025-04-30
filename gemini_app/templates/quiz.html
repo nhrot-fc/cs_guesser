@@ -252,6 +252,29 @@
         background: linear-gradient(to right, #8b5cf6, #661ae6);
         transition: width 0.5s ease;
     }
+
+    /* Unified badge styling for spans */
+    .badge {
+        display: inline-block;
+        font-size: 0.875rem; /* text-sm */
+        padding: 0.25rem 0.75rem;
+        background-color: var(--card-bg);
+        color: var(--accent-color);
+        border: 1px solid var(--accent-color);
+        border-radius: 9999px;
+        transition: background-color 0.3s, color 0.3s;
+    }
+    .badge:hover {
+        background-color: var(--accent-color);
+        color: var(--background-color);
+    }
+
+    /* Increase option-letter badge size */
+    #options-container .option-btn .letter-badge {
+        width: 2rem;
+        height: 2rem;
+        font-size: 1rem;
+    }
 </style>
 {% endblock %}
 
@@ -299,10 +322,10 @@
             
             <!-- Etiquetas -->
             <div class="flex flex-wrap gap-2 mt-2">
-                <span class="px-2 py-0.5 bg-dark-matter/80 border border-void-purple/50 text-void-purple rounded-full text-xs">
+                <span class="badge">
                     {{ question.questionType }}
                 </span>
-                <span class="px-2 py-0.5 bg-dark-matter/80 border border-void-purple/50 text-void-purple rounded-full text-xs">
+                <span class="badge">
                     {{ question.metadata.difficulty }}
                 </span>
             </div>
@@ -340,7 +363,7 @@
                         class="option-btn w-full text-left py-3 px-4 border border-dark-matter/30 bg-gradient-to-r from-dark-matter/80 to-dark-matter/60 rounded-md flex items-center gap-3 transform transition-all duration-300 ease-out hover:scale-[1.02] shine-effect backdrop-blur-sm animate-slide-in"
                         data-index="{{ forloop.counter0 }}" 
                         data-answer="{{ option.answer|yesno:'true,false' }}">
-                    <span class="inline-flex justify-center items-center w-7 h-7 rounded-full bg-deep-space text-void-purple text-sm font-semibold border border-void-purple/50 shadow-md">
+                    <span class="inline-flex justify-center items-center letter-badge rounded-full bg-deep-space text-void-purple font-semibold border border-void-purple/50 shadow-md">
                         {{ forloop.counter|add:"64"|stringformat:"c" }}
                     </span> 
                     <span class="option-text text-code-white">{{ option.label }}</span>
